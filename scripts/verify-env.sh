@@ -59,9 +59,13 @@ else
     echo -e "${COLOR_GREEN}PASS (Proton ARM64 runtime active)${COLOR_RESET}"
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # 5. Search for Lossless.dll in Steam Libraries
 echo "[5/6] Searching for licensed Lossless.dll in Steam libraries..."
 SEARCH_PATHS=(
+    "$ROOT_DIR/Lossless.dll"
     "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/Lossless.dll"
     "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"

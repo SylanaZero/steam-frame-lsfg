@@ -9,12 +9,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "=== Installing Steam Frame LSFG Support ==="
 
-# 1. Run Verification
-if [ -f "$SCRIPT_DIR/verify-env.sh" ]; then
-    bash "$SCRIPT_DIR/verify-env.sh"
-fi
-
-# 2. Setup Directories
+# 1. Setup Directories
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/steam-frame-lsfg"
 VULKAN_LAYER_DIR="$HOME/.local/share/vulkan/implicit_layer.d"
 LIB_DIR="$HOME/.local/share/steam-frame-lsfg/lib"
@@ -24,7 +19,22 @@ mkdir -p "$VULKAN_LAYER_DIR"
 mkdir -p "$LIB_DIR"
 mkdir -p "$HOME/.local/bin"
 
-# 3. Copy Default Configurations if not already present
+# 2. Deploy bundled Lossless.dll if included in package
+if [ -f "$ROOT_DIR/Lossless.dll" ]; then
+    echo "Installing bundled Lossless.dll..."
+    cp "$ROOT_DIR/Lossless.dll" "$LIB_DIR/Lossless.dll"
+    STEAM_DIR="$HOME/.local/share/Steam/steamapps/common/Lossless Scaling"
+    mkdir -p "$STEAM_DIR"
+    cp "$ROOT_DIR/Lossless.dll" "$STEAM_DIR/Lossless.dll"
+    echo "Lossless.dll deployed to: $STEAM_DIR/Lossless.dll"
+fi
+
+# 3. Run Environment Verification
+if [ -f "$SCRIPT_DIR/verify-env.sh" ]; then
+    bash "$SCRIPT_DIR/verify-env.sh"
+fi
+
+# 4. Copy Default Configurations if not already present
 if [ ! -f "$CONFIG_DIR/config.toml" ]; then
     echo "Creating default configuration at $CONFIG_DIR/config.toml..."
     cp "$ROOT_DIR/config/config.default.toml" "$CONFIG_DIR/config.toml"
@@ -33,7 +43,7 @@ fi
 cp -r "$ROOT_DIR/config/profiles/"* "$CONFIG_DIR/profiles/"
 echo "Default game profiles installed to $CONFIG_DIR/profiles/"
 
-# 4. Install Vulkan Layer Library and Manifests
+# 5. Install Vulkan Layer Library and Manifests
 echo "Installing Vulkan Layer binary and manifests..."
 if [ -f "$ROOT_DIR/layer/liblsfg-vk-layer.so" ]; then
     cp "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$LIB_DIR/liblsfg-vk-layer.so"
@@ -46,17 +56,7 @@ if [ -f "$ROOT_DIR/layer/VkLayer_lsfg.json" ]; then
     cp "$ROOT_DIR/layer/VkLayer_lsfg.json" "$VULKAN_LAYER_DIR/VkLayer_lsfg.json"
 fi
 
-# Deploy bundled Lossless.dll if included in package
-if [ -f "$ROOT_DIR/Lossless.dll" ]; then
-    echo "Installing bundled Lossless.dll..."
-    cp "$ROOT_DIR/Lossless.dll" "$LIB_DIR/Lossless.dll"
-    STEAM_DIR="$HOME/.local/share/Steam/steamapps/common/Lossless Scaling"
-    mkdir -p "$STEAM_DIR"
-    cp "$ROOT_DIR/Lossless.dll" "$STEAM_DIR/Lossless.dll"
-    echo "Lossless.dll deployed to: $STEAM_DIR/Lossless.dll"
-fi
-
-# 5. Install Launch Wrapper
+# 6. Install Launch Wrapper
 chmod +x "$SCRIPT_DIR/lsfg-frame"
 cp "$SCRIPT_DIR/lsfg-frame" "$HOME/.local/bin/lsfg-frame"
 chmod +x "$HOME/.local/bin/lsfg-frame"
@@ -66,7 +66,7 @@ ln -sf "$HOME/.local/bin/lsfg-frame" "$HOME/lsfg"
 echo "Launch wrapper installed to: $HOME/.local/bin/lsfg-frame"
 echo "User shortcut created:       $HOME/lsfg"
 
-# 6. Optional Decky Loader Integration
+# 7. Optional Decky Loader Integration
 DECKY_PLUGIN_DIR="$HOME/homebrew/plugins"
 if [ -d "$DECKY_PLUGIN_DIR" ]; then
     echo "Decky Loader detected! Installing Steam Frame LSFG plugin..."
