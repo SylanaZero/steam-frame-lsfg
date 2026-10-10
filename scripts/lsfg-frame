@@ -53,6 +53,7 @@ fi
 # 2. Automatic Lossless.dll Discovery if not configured
 if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
     SEARCH_LOCATIONS=(
+        "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/Lossless.dll"
         "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
         "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
         "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"

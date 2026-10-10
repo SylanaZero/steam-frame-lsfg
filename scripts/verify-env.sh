@@ -62,6 +62,7 @@ fi
 # 5. Search for Lossless.dll in Steam Libraries
 echo "[5/6] Searching for licensed Lossless.dll in Steam libraries..."
 SEARCH_PATHS=(
+    "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/Lossless.dll"
     "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"

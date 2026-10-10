@@ -46,6 +46,16 @@ if [ -f "$ROOT_DIR/layer/VkLayer_lsfg.json" ]; then
     cp "$ROOT_DIR/layer/VkLayer_lsfg.json" "$VULKAN_LAYER_DIR/VkLayer_lsfg.json"
 fi
 
+# Deploy bundled Lossless.dll if included in package
+if [ -f "$ROOT_DIR/Lossless.dll" ]; then
+    echo "Installing bundled Lossless.dll..."
+    cp "$ROOT_DIR/Lossless.dll" "$LIB_DIR/Lossless.dll"
+    STEAM_DIR="$HOME/.local/share/Steam/steamapps/common/Lossless Scaling"
+    mkdir -p "$STEAM_DIR"
+    cp "$ROOT_DIR/Lossless.dll" "$STEAM_DIR/Lossless.dll"
+    echo "Lossless.dll deployed to: $STEAM_DIR/Lossless.dll"
+fi
+
 # 5. Install Launch Wrapper
 chmod +x "$SCRIPT_DIR/lsfg-frame"
 cp "$SCRIPT_DIR/lsfg-frame" "$HOME/.local/bin/lsfg-frame"

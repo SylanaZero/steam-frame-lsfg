@@ -4,6 +4,7 @@ build-*/
 *.so
 *.o
 *.a
+*.dll
 
 # Submodules if cloned standalone
 # submodules/
