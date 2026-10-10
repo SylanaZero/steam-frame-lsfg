@@ -84,10 +84,19 @@ for vdf in "$HOME/.local/share/Steam/steamapps/libraryfolders.vdf" "$HOME/.steam
 done
 
 FOUND_DLL=""
+FOUND_SOURCE=""
+
 for p in "${SEARCH_PATHS[@]}"; do
     for match in $p; do
         if [ -f "$match" ]; then
             FOUND_DLL="$match"
+            if [[ "$match" == *".local/share/steam-frame-lsfg/lib"* ]]; then
+                FOUND_SOURCE="Local Framegen Library (~/.local/share/steam-frame-lsfg/lib)"
+            elif [[ "$match" == *"steamapps/common"* ]]; then
+                FOUND_SOURCE="Steam Library Directory"
+            else
+                FOUND_SOURCE="Steam / Storage Path"
+            fi
             break 2
         fi
     done
@@ -96,18 +105,25 @@ done
 # Fallback deep search across Steam directories if still not found
 if [ -z "$FOUND_DLL" ]; then
     FOUND_DLL=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" 2>/dev/null | head -n1 || true)
+    if [ -n "$FOUND_DLL" ]; then
+        FOUND_SOURCE="Deep Filesystem Search"
+    fi
 fi
 
 # Fallback: check bundled DLL in package root directory last
 if [ -z "$FOUND_DLL" ] && [ -f "$ROOT_DIR/Lossless.dll" ]; then
     FOUND_DLL="$ROOT_DIR/Lossless.dll"
+    FOUND_SOURCE="Package Root Fallback ($ROOT_DIR)"
 fi
 
 if [ -n "$FOUND_DLL" ]; then
-    FILE_SIZE=$(du -h "$FOUND_DLL" | cut -f1)
-    echo -e "      ${COLOR_GREEN}✓ Found Lossless.dll at:${COLOR_RESET} $FOUND_DLL (Size: $FILE_SIZE)"
+    FILE_SIZE=$(du -h "$FOUND_DLL" 2>/dev/null | cut -f1 || echo "unknown")
+    echo -e "      ${COLOR_GREEN}✓ Found Lossless.dll:${COLOR_RESET}"
+    echo -e "        • Location: ${COLOR_GREEN}$FOUND_DLL${COLOR_RESET}"
+    echo -e "        • Origin:   $FOUND_SOURCE"
+    echo -e "        • File Size: $FILE_SIZE"
 else
-    echo -e "      ${COLOR_RED}✗ Lossless.dll not found in standard paths.${COLOR_RESET}"
+    echo -e "      ${COLOR_RED}✗ Lossless.dll not found in standard paths or package root.${COLOR_RESET}"
     echo -e "      Ensure 'Lossless Scaling' on Steam has finished downloading the 'lsfg-vk' branch."
     echo -e "      If installed elsewhere, set dll_path in ~/.config/steam-frame-lsfg/config.toml"
 fi
@@ -120,4 +136,14 @@ else
     echo -e "${COLOR_YELLOW}OPTIONAL: Decky Loader not detected. Standalone CLI mode will be used.${COLOR_RESET}"
 fi
 
-echo -e "\n${COLOR_BLUE}Verification completed.${COLOR_RESET}"
+echo -e "\n${COLOR_BLUE}=====================================================${COLOR_RESET}"
+echo -e "${COLOR_BLUE}                Verification Summary                 ${COLOR_RESET}"
+echo -e "${COLOR_BLUE}=====================================================${COLOR_RESET}"
+if [ -n "$FOUND_DLL" ]; then
+    echo -e "  Lossless.dll Path : ${COLOR_GREEN}$FOUND_DLL${COLOR_RESET}"
+    echo -e "  Resolved From     : $FOUND_SOURCE ($FILE_SIZE)"
+else
+    echo -e "  Lossless.dll Path : ${COLOR_RED}NOT FOUND${COLOR_RESET}"
+fi
+echo -e "${COLOR_BLUE}=====================================================${COLOR_RESET}"
+echo -e "${COLOR_BLUE}Verification completed.${COLOR_RESET}\n"
