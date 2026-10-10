@@ -14,6 +14,7 @@ import { FaBolt, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
 interface LSFGStatus {
   dll_found: boolean;
   dll_path: string;
+  aurora_found?: boolean;
   config: {
     enabled: boolean;
     multiplier: number;
@@ -102,6 +103,24 @@ const Content: VFC<{ serverApi: ServerAPI }> = ({ serverApi }) => {
               <FaCheckCircle style={{ color: "#4CAF50" }} />
             ) : (
               <FaExclamationTriangle style={{ color: "#FF9800" }} />
+            )
+          }
+        />
+      </PanelSectionRow>
+
+      <PanelSectionRow>
+        <Field
+          label="Turnip Driver"
+          description={
+            status?.aurora_found
+              ? "Balemuni's Aurora (Apex Universal) Active"
+              : "System Mesa Turnip (Run install-turnip-aurora.sh for optimal performance)"
+          }
+          icon={
+            status?.aurora_found ? (
+              <FaCheckCircle style={{ color: "#4CAF50" }} />
+            ) : (
+              <FaCheckCircle style={{ color: "#2196F3" }} />
             )
           }
         />

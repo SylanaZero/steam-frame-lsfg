@@ -40,10 +40,14 @@ class Plugin:
                 dll_path = path
                 break
 
+        aurora_icd = Path(os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share"))) / "steam-frame-lsfg" / "drivers" / "freedreno_icd.aarch64.json"
+        aurora_found = aurora_icd.exists()
+
         cfg = await self.get_config(0)
         return {
             "dll_found": dll_found,
             "dll_path": dll_path,
+            "aurora_found": aurora_found,
             "config": cfg,
             "hardware": "Qualcomm Snapdragon 8 Gen 3 (Adreno 750 / Turnip)"
         }
