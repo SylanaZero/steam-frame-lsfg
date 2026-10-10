@@ -8,8 +8,16 @@
 set -e
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/steam-frame-lsfg"
+LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/lsfg.log"
+
 GLOBAL_CONFIG="$CONFIG_DIR/config.toml"
 APP_ID="${SteamAppId:-0}"
+
+echo "=== Steam Frame LSFG Session: $(date) ===" > "$LOG_FILE"
+echo "AppID: $APP_ID" >> "$LOG_FILE"
+echo "Command: $@" >> "$LOG_FILE"
 
 # 1. Profile Resolution
 TARGET_CONFIG="$GLOBAL_CONFIG"
@@ -133,6 +141,10 @@ if [ "$ENABLED" -eq 1 ]; then
     export MESA_VK_WSI_PRESENT_MODE="mailbox"
 
     echo "[SteamFrame-LSFG] Active for AppID $APP_ID | Multiplier: ${MULTIPLIER}x | Flow: $FLOW_SCALE | PerfMode: $PERF_MODE"
+    echo "Resolved Lossless.dll: $DLL_PATH" >> "$LOG_FILE"
+    echo "Active Profile: $TARGET_CONFIG" >> "$LOG_FILE"
+    echo "Framegen Settings: ${MULTIPLIER}x | Flow: $FLOW_SCALE | PerfMode: $PERF_MODE" >> "$LOG_FILE"
+    echo "Layer Activated: $VK_INSTANCE_LAYERS" >> "$LOG_FILE"
 else
     export ENABLE_LSFG=0
     echo "[SteamFrame-LSFG] Disabled for AppID $APP_ID"
