@@ -55,14 +55,9 @@ if [ -f "$SCRIPT_DIR/verify-env.sh" ]; then
     bash "$SCRIPT_DIR/verify-env.sh"
 fi
 
-# 4. Copy Default Configurations if not already present
-if [ ! -f "$CONFIG_DIR/config.toml" ]; then
-    echo "Creating default configuration at $CONFIG_DIR/config.toml..."
-    cp "$ROOT_DIR/config/config.default.toml" "$CONFIG_DIR/config.toml"
-fi
-
-cp -r "$ROOT_DIR/config/profiles/"* "$CONFIG_DIR/profiles/"
-echo "Default game profiles installed to $CONFIG_DIR/profiles/"
+# 4. Copy Default Configurations (Schema Version 2 for lsfg-vk layer)
+echo "Deploying canonical Schema Version 2 configuration..."
+cp "$ROOT_DIR/config/config.default.toml" "$CONFIG_DIR/config.toml"
 
 # Upstream lsfg-vk config path symlink
 mkdir -p "$HOME/.config/lsfg-vk"
@@ -90,9 +85,6 @@ cat <<EOF > "$VULKAN_LAYER_DIR/VkLayer_LSFGVK_frame_generation.json"
     "library_path": "$LIB_DIR/liblsfg-vk-layer.so",
     "type": "GLOBAL",
     "api_version": "1.3.0",
-    "enable_environment": {
-      "ENABLE_LSFG": "1"
-    },
     "disable_environment": {
       "DISABLE_LSFGVK": "1"
     }

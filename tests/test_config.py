@@ -25,11 +25,12 @@ class TestSteamFrameLSFGConfig(unittest.TestCase):
         if tomllib:
             with open(default_cfg, "rb") as f:
                 data = tomllib.load(f)
-            self.assertIn("general", data)
-            self.assertIn("framegen", data)
-            self.assertIn("gpu", data)
+            self.assertIn("version", data)
+            self.assertEqual(data["version"], 2)
+            self.assertIn("global", data)
+            self.assertIn("profile", data)
             
-            fg = data["framegen"]
+            fg = data["profile"][0]
             self.assertIn(fg["multiplier"], [2, 3, 4], "Multiplier must be 2, 3, or 4")
             self.assertTrue(0.5 <= fg["flow_scale"] <= 1.0, "Flow scale must be between 0.5 and 1.0")
             self.assertIsInstance(fg["performance_mode"], bool)
