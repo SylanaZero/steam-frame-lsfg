@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Steam Frame LSFG: Automated Cross-Compilation Script
-# Builds libVkLayer_lsfg.so (aarch64 / ARM64) from an x86_64 host.
+# Builds liblsfg-vk-layer.so (aarch64 / ARM64) from an x86_64 host.
 
 set -e
 
@@ -8,15 +8,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SUBMODULE_DIR="$ROOT_DIR/submodules/lsfg-vk"
 LAYER_DIR="$ROOT_DIR/layer"
-CROSS_FILE="$ROOT_DIR/meson/aarch64-cross.txt"
+TOOLCHAIN_FILE="$ROOT_DIR/cmake/aarch64-toolchain.cmake"
 
 echo "=== Building Steam Frame LSFG Layer (ARM64 / aarch64) ==="
 
-# 1. Ensure upstream PancakeTAS/lsfg-vk is cloned / initialized
-if [ ! -d "$SUBMODULE_DIR" ] || [ ! -f "$SUBMODULE_DIR/meson.build" ]; then
-    echo "[1/4] Cloning upstream PancakeTAS/lsfg-vk into submodules/lsfg-vk..."
+# 1. Ensure upstream lsfg-vk is cloned / initialized
+if [ ! -d "$SUBMODULE_DIR" ] || [ ! -f "$SUBMODULE_DIR/CMakeLists.txt" ]; then
+    echo "[1/4] Cloning upstream lsfg-vk into submodules/lsfg-vk..."
     mkdir -p "$ROOT_DIR/submodules"
-    git clone --depth 1 https://github.com/PancakeTAS/lsfg-vk.git "$SUBMODULE_DIR"
+    git clone --depth 1 https://git.lsfg-vk.dev/lsfg-vk.git "$SUBMODULE_DIR"
 else
     echo "[1/4] Upstream source found at $SUBMODULE_DIR"
 fi
@@ -32,33 +32,44 @@ if ! command -v aarch64-linux-gnu-g++ &>/dev/null; then
     exit 1
 fi
 
-# 3. Configure Meson build directory
+# 3. Configure CMake with Snapdragon 8 Gen 3 cross profile
 BUILD_DIR="$SUBMODULE_DIR/build-arm64"
-echo "[2/4] Configuring Meson build with Snapdragon 8 Gen 3 cross profile..."
-if [ -d "$BUILD_DIR" ]; then
-    meson setup "$BUILD_DIR" "$SUBMODULE_DIR" --cross-file "$CROSS_FILE" --buildtype=release --reconfigure
-else
-    meson setup "$BUILD_DIR" "$SUBMODULE_DIR" --cross-file "$CROSS_FILE" --buildtype=release
-fi
+echo "[2/4] Configuring CMake with Snapdragon 8 Gen 3 cross toolchain..."
+cmake -B "$BUILD_DIR" -S "$SUBMODULE_DIR" \
+    -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DLSFGVK_BUILD_LAYER=ON \
+    -DLSFGVK_BUILD_CLI=ON \
+    -DLSFGVK_BUILD_UI=OFF
 
 # 4. Compile with Ninja
 echo "[3/4] Compiling ARM64 Vulkan layer..."
-ninja -C "$BUILD_DIR"
+cmake --build "$BUILD_DIR" --target lsfg-vk-layer -j"$(nproc 2>/dev/null || echo 4)"
 
-# 5. Extract output binary to layer/ directory
-echo "[4/4] Deploying compiled binary..."
-OUTPUT_BIN=$(find "$BUILD_DIR" -name "libVkLayer_lsfg.so" | head -n1)
-if [ -z "$OUTPUT_BIN" ] || [ ! -f "$OUTPUT_BIN" ]; then
-    echo "ERROR: libVkLayer_lsfg.so was not found in the build directory."
+# 5. Extract output binary & manifest to layer/ directory
+echo "[4/4] Deploying compiled binary and manifest..."
+mkdir -p "$LAYER_DIR"
+
+OUTPUT_SO=$(find "$BUILD_DIR" -name "liblsfg-vk-layer.so" | head -n1)
+if [ -z "$OUTPUT_SO" ] || [ ! -f "$OUTPUT_SO" ]; then
+    echo "ERROR: liblsfg-vk-layer.so was not found in the build directory."
     exit 1
 fi
 
-mkdir -p "$LAYER_DIR"
-cp "$OUTPUT_BIN" "$LAYER_DIR/libVkLayer_lsfg.so"
+cp "$OUTPUT_SO" "$LAYER_DIR/liblsfg-vk-layer.so"
+# Also symlink or copy to libVkLayer_lsfg.so for alias compatibility
+cp "$OUTPUT_SO" "$LAYER_DIR/libVkLayer_lsfg.so"
+
+OUTPUT_JSON=$(find "$BUILD_DIR" -name "VkLayer_LSFGVK_frame_generation.json" | head -n1)
+if [ -n "$OUTPUT_JSON" ] && [ -f "$OUTPUT_JSON" ]; then
+    cp "$OUTPUT_JSON" "$LAYER_DIR/VkLayer_LSFGVK_frame_generation.json"
+fi
 
 echo ""
 echo "=== Build Successful! ==="
-echo "Artifact generated: $LAYER_DIR/libVkLayer_lsfg.so"
+echo "Layer library:  $LAYER_DIR/liblsfg-vk-layer.so"
+echo "Layer manifest: $LAYER_DIR/VkLayer_LSFGVK_frame_generation.json"
 if command -v file &>/dev/null; then
-    file "$LAYER_DIR/libVkLayer_lsfg.so"
+    file "$LAYER_DIR/liblsfg-vk-layer.so"
 fi

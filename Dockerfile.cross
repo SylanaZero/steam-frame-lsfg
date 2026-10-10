@@ -1,25 +1,21 @@
 # Multiarch Debian cross-compilation environment for Steam Frame LSFG (aarch64)
 FROM debian:bookworm-slim
 
-# Enable multiarch for arm64
 RUN dpkg --add-architecture arm64 && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential \
         crossbuild-essential-arm64 \
-        meson \
+        cmake \
         ninja-build \
         git \
         pkg-config \
         python3 \
-        python3-pip \
         ca-certificates \
-        libvulkan-dev:arm64 \
-        glslang-tools \
-        spirv-tools && \
+        file && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
 
-# Default command compiles the layer using the Meson cross file
+# Run the automated build script
 CMD ["bash", "scripts/build-cross-layer.sh"]

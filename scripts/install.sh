@@ -33,9 +33,18 @@ fi
 cp -r "$ROOT_DIR/config/profiles/"* "$CONFIG_DIR/profiles/"
 echo "Default game profiles installed to $CONFIG_DIR/profiles/"
 
-# 4. Install Vulkan Layer Manifest
-echo "Installing Vulkan Layer manifest..."
-cp "$ROOT_DIR/layer/VkLayer_lsfg.json" "$VULKAN_LAYER_DIR/VkLayer_lsfg.json"
+# 4. Install Vulkan Layer Library and Manifests
+echo "Installing Vulkan Layer binary and manifests..."
+if [ -f "$ROOT_DIR/layer/liblsfg-vk-layer.so" ]; then
+    cp "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$LIB_DIR/liblsfg-vk-layer.so"
+    cp "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$LIB_DIR/libVkLayer_lsfg.so"
+fi
+if [ -f "$ROOT_DIR/layer/VkLayer_LSFGVK_frame_generation.json" ]; then
+    cp "$ROOT_DIR/layer/VkLayer_LSFGVK_frame_generation.json" "$VULKAN_LAYER_DIR/VkLayer_LSFGVK_frame_generation.json"
+fi
+if [ -f "$ROOT_DIR/layer/VkLayer_lsfg.json" ]; then
+    cp "$ROOT_DIR/layer/VkLayer_lsfg.json" "$VULKAN_LAYER_DIR/VkLayer_lsfg.json"
+fi
 
 # 5. Install Launch Wrapper
 chmod +x "$SCRIPT_DIR/lsfg-frame"

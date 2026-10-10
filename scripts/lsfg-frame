@@ -84,9 +84,9 @@ if [ "$ENABLED" -eq 1 ]; then
     
     # Ensure Vulkan layer is explicitly enabled in instance
     if [ -n "$VK_INSTANCE_LAYERS" ]; then
-        export VK_INSTANCE_LAYERS="VK_LAYER_LS_frame_generation:$VK_INSTANCE_LAYERS"
+        export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation:VK_LAYER_LS_frame_generation:$VK_INSTANCE_LAYERS"
     else
-        export VK_INSTANCE_LAYERS="VK_LAYER_LS_frame_generation"
+        export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation:VK_LAYER_LS_frame_generation"
     fi
 
     # Qualcomm Adreno 750 / Turnip optimizations
