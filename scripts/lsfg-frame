@@ -55,10 +55,19 @@ if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
     SEARCH_LOCATIONS=(
         "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
         "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
+        "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
         "/run/media/*/steamapps/common/Lossless Scaling/Lossless.dll"
         "/run/media/*/*/steamapps/common/Lossless Scaling/Lossless.dll"
         "/var/mnt/storage/steamapps/common/Lossless Scaling/Lossless.dll"
     )
+    for vdf in "$HOME/.local/share/Steam/steamapps/libraryfolders.vdf" "$HOME/.steam/steam/steamapps/libraryfolders.vdf"; do
+        if [ -f "$vdf" ]; then
+            while read -r libpath; do
+                [ -n "$libpath" ] && SEARCH_LOCATIONS+=("$libpath/steamapps/common/Lossless Scaling/Lossless.dll")
+            done < <(grep '"path"' "$vdf" 2>/dev/null | cut -d '"' -f 4 || true)
+        fi
+    done
+
     for p in "${SEARCH_LOCATIONS[@]}"; do
         for match in $p; do
             if [ -f "$match" ]; then
@@ -67,6 +76,11 @@ if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
             fi
         done
     done
+
+    # Fallback deep search if still not found
+    if [ -z "$DLL_PATH" ]; then
+        DLL_PATH=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" 2>/dev/null | head -n1 || true)
+    fi
 fi
 
 if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then

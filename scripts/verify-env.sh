@@ -64,10 +64,20 @@ echo "[5/6] Searching for licensed Lossless.dll in Steam libraries..."
 SEARCH_PATHS=(
     "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
+    "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "/run/media/*/steamapps/common/Lossless Scaling/Lossless.dll"
     "/run/media/*/*/steamapps/common/Lossless Scaling/Lossless.dll"
     "/var/mnt/storage/steamapps/common/Lossless Scaling/Lossless.dll"
 )
+
+# Also check dynamic libraries from libraryfolders.vdf
+for vdf in "$HOME/.local/share/Steam/steamapps/libraryfolders.vdf" "$HOME/.steam/steam/steamapps/libraryfolders.vdf"; do
+    if [ -f "$vdf" ]; then
+        while read -r libpath; do
+            [ -n "$libpath" ] && SEARCH_PATHS+=("$libpath/steamapps/common/Lossless Scaling/Lossless.dll")
+        done < <(grep '"path"' "$vdf" 2>/dev/null | cut -d '"' -f 4 || true)
+    fi
+done
 
 FOUND_DLL=""
 for p in "${SEARCH_PATHS[@]}"; do
@@ -79,12 +89,18 @@ for p in "${SEARCH_PATHS[@]}"; do
     done
 done
 
+# Fallback deep search if still not found
+if [ -z "$FOUND_DLL" ]; then
+    FOUND_DLL=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" 2>/dev/null | head -n1 || true)
+fi
+
 if [ -n "$FOUND_DLL" ]; then
     FILE_SIZE=$(du -h "$FOUND_DLL" | cut -f1)
     echo -e "      ${COLOR_GREEN}✓ Found Lossless.dll at:${COLOR_RESET} $FOUND_DLL (Size: $FILE_SIZE)"
 else
     echo -e "      ${COLOR_RED}✗ Lossless.dll not found in standard paths.${COLOR_RESET}"
-    echo -e "      Please ensure 'Lossless Scaling' (Steam App ID 993090) is downloaded via Steam on this device."
+    echo -e "      Ensure 'Lossless Scaling' on Steam has finished downloading the 'lsfg-vk' branch."
+    echo -e "      If installed elsewhere, set dll_path in ~/.config/steam-frame-lsfg/config.toml"
 fi
 
 # 6. Check Decky Loader Status
