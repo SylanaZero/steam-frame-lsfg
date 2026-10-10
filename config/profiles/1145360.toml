@@ -1,0 +1,9 @@
+# Hades II (AppID: 1145360)
+# Profile tuned for fast 2D / isometric action on Steam Frame
+# Baseline target: 72 FPS native -> 144 FPS ultra-smooth presentation
+
+enabled = true
+multiplier = 2
+flow_scale = 1.0
+performance_mode = false
+sync_to_display = true

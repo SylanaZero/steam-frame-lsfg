@@ -1,0 +1,21 @@
+# Build output
+build/
+build-*/
+*.so
+*.o
+*.a
+
+# Submodules if cloned standalone
+# submodules/
+
+# Node / Decky plugin
+node_modules/
+dist/
+*.pyc
+__pycache__/
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

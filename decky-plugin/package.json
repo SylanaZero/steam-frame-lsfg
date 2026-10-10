@@ -1,0 +1,13 @@
+{
+  "name": "steam-frame-lsfg",
+  "version": "1.0.0",
+  "description": "Decky plugin for Lossless Scaling Frame Generation on Steam Frame",
+  "scripts": {
+    "build": "rollup -c"
+  },
+  "dependencies": {
+    "decky-frontend-lib": "^4.0.0",
+    "react": "^18.2.0",
+    "react-icons": "^5.0.0"
+  }
+}

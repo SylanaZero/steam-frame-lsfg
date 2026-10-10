@@ -1,0 +1,5 @@
+# Default Profile for Steam Games on Steam Frame
+enabled = true
+multiplier = 2
+flow_scale = 0.75
+performance_mode = true

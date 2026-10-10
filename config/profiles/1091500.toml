@@ -1,0 +1,9 @@
+# Cyberpunk 2077 (AppID: 1091500)
+# Profile tuned for heavy 3D rendering on Snapdragon 8 Gen 3
+# Baseline target: 30-40 FPS native -> 90-120 FPS with 3x or 2x frame generation
+
+enabled = true
+multiplier = 2
+flow_scale = 0.65
+performance_mode = true
+sync_to_display = true

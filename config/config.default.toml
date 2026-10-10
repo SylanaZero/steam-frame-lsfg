@@ -1,0 +1,52 @@
+# Steam Frame LSFG Global Configuration File
+# Optimized for Qualcomm Snapdragon 8 Gen 3 (Adreno 750 GPU / Mesa Turnip driver)
+
+[general]
+# Global enable toggle: true / false
+enabled = true
+
+# Path to the licensed Lossless.dll file from Steam
+# If empty, the wrapper will automatically search standard Steam library locations
+# (e.g., ~/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll)
+dll_path = ""
+
+# Logging verbosity: "error", "warn", "info", "debug"
+log_level = "info"
+
+[framegen]
+# Frame generation multiplier: 2, 3, or 4
+# Multiplier 2 is recommended for Adreno 750 (45->90 FPS, 60->120 FPS, 72->144 FPS)
+multiplier = 2
+
+# Flow Scale: 0.5 to 1.0 (Controls resolution of the optical flow estimation pass)
+# 1.0 = Full resolution optical flow (sharpest interpolation)
+# 0.75 = Recommended balance for Adreno 750 thermal headroom
+# 0.5 = Lowest overhead / maximum battery saver
+flow_scale = 0.75
+
+# Performance Mode: Enables fast FP16 compute shader math and reduces flow iterations
+# Strongly recommended on Snapdragon 8 Gen 3 to prevent thermal throttling
+performance_mode = true
+
+# HDR Mode: "passthrough", "sdr", or "hdr10"
+hdr_mode = "passthrough"
+
+# Tear-free presentation / VSync synchronization with Steam Frame display
+# Matches Gamescope refresh rates: 72, 90, 120, 144
+sync_to_display = true
+
+[gpu]
+# Target GPU driver tuning
+driver_backend = "turnip"
+
+# Enable FP16 half-precision math (Adreno 750 ALU boost)
+enable_fp16 = true
+
+# GMEM tile bypass for high-resolution swapchains (2160x2160)
+# Helps prevent excessive tile loads/stores in optical flow passes
+direct_rendering = true
+
+[profiles]
+# Enable automatic loading of per-game AppID profiles
+auto_detect_appid = true
+profile_directory = "~/.config/steam-frame-lsfg/profiles"

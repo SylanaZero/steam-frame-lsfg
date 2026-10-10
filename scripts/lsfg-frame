@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Steam Frame LSFG Launch Wrapper
+# Usage in Steam Launch Options:
+# ~/lsfg %command%
+# or:
+# /usr/local/bin/lsfg-frame %command%
+
+set -e
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/steam-frame-lsfg"
+GLOBAL_CONFIG="$CONFIG_DIR/config.toml"
+APP_ID="${SteamAppId:-0}"
+
+# 1. Profile Resolution
+TARGET_CONFIG="$GLOBAL_CONFIG"
+if [ "$APP_ID" != "0" ] && [ -f "$CONFIG_DIR/profiles/$APP_ID.toml" ]; then
+    TARGET_CONFIG="$CONFIG_DIR/profiles/$APP_ID.toml"
+fi
+
+# Fallback defaults if config files are missing
+ENABLED=1
+MULTIPLIER=2
+FLOW_SCALE=0.75
+PERF_MODE=1
+DLL_PATH=""
+
+# Helper function to parse TOML keys
+get_toml_val() {
+    local file="$1"
+    local key="$2"
+    if [ -f "$file" ]; then
+        grep -E "^[[:space:]]*${key}[[:space:]]*=" "$file" | head -n1 | cut -d'=' -f2 | tr -d ' "\r\n'
+    fi
+}
+
+if [ -f "$TARGET_CONFIG" ]; then
+    CFG_ENABLED=$(get_toml_val "$TARGET_CONFIG" "enabled")
+    [ "$CFG_ENABLED" = "false" ] && ENABLED=0
+    
+    CFG_MULT=$(get_toml_val "$TARGET_CONFIG" "multiplier")
+    [ -n "$CFG_MULT" ] && MULTIPLIER="$CFG_MULT"
+    
+    CFG_FLOW=$(get_toml_val "$TARGET_CONFIG" "flow_scale")
+    [ -n "$CFG_FLOW" ] && FLOW_SCALE="$CFG_FLOW"
+    
+    CFG_PERF=$(get_toml_val "$TARGET_CONFIG" "performance_mode")
+    [ "$CFG_PERF" = "false" ] && PERF_MODE=0
+    
+    CFG_DLL=$(get_toml_val "$TARGET_CONFIG" "dll_path")
+    [ -n "$CFG_DLL" ] && DLL_PATH="$CFG_DLL"
+fi
+
+# 2. Automatic Lossless.dll Discovery if not configured
+if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
+    SEARCH_LOCATIONS=(
+        "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
+        "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
+        "/run/media/*/steamapps/common/Lossless Scaling/Lossless.dll"
+        "/run/media/*/*/steamapps/common/Lossless Scaling/Lossless.dll"
+        "/var/mnt/storage/steamapps/common/Lossless Scaling/Lossless.dll"
+    )
+    for p in "${SEARCH_LOCATIONS[@]}"; do
+        for match in $p; do
+            if [ -f "$match" ]; then
+                DLL_PATH="$match"
+                break 2
+            fi
+        done
+    done
+fi
+
+if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
+    echo "[SteamFrame-LSFG] WARNING: Lossless.dll could not be located. Launching game without framegen."
+    exec "$@"
+fi
+
+# 3. Export Environment Variables for Vulkan Layer & Turnip
+if [ "$ENABLED" -eq 1 ]; then
+    export ENABLE_LSFG=1
+    export LSFG_MULTIPLIER="$MULTIPLIER"
+    export LSFG_FLOW_SCALE="$FLOW_SCALE"
+    export LSFG_PERFORMANCE_MODE="$PERF_MODE"
+    export LSFG_DLL_PATH="$DLL_PATH"
+    
+    # Ensure Vulkan layer is explicitly enabled in instance
+    if [ -n "$VK_INSTANCE_LAYERS" ]; then
+        export VK_INSTANCE_LAYERS="VK_LAYER_LS_frame_generation:$VK_INSTANCE_LAYERS"
+    else
+        export VK_INSTANCE_LAYERS="VK_LAYER_LS_frame_generation"
+    fi
+
+    # Qualcomm Adreno 750 / Turnip optimizations
+    export TU_DEBUG="noconform"
+    export MESA_VK_WSI_PRESENT_MODE="mailbox"
+
+    echo "[SteamFrame-LSFG] Active for AppID $APP_ID | Multiplier: ${MULTIPLIER}x | Flow: $FLOW_SCALE | PerfMode: $PERF_MODE"
+else
+    export ENABLE_LSFG=0
+    echo "[SteamFrame-LSFG] Disabled for AppID $APP_ID"
+fi
+
+# 4. Hand off execution to game
+exec "$@"
