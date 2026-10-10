@@ -82,7 +82,12 @@ if [ "$ENABLED" -eq 1 ]; then
     export LSFG_PERFORMANCE_MODE="$PERF_MODE"
     export LSFG_DLL_PATH="$DLL_PATH"
     
-    # Ensure Vulkan layer is explicitly enabled in instance
+    # Ensure Vulkan layer is explicitly enabled in instance and discovered
+    LAYER_LIB_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib"
+    LAYER_MANIFEST_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d"
+    export LD_LIBRARY_PATH="$LAYER_LIB_DIR:${LD_LIBRARY_PATH:-}"
+    export VK_LAYER_PATH="$LAYER_MANIFEST_DIR:${VK_LAYER_PATH:-}"
+
     if [ -n "$VK_INSTANCE_LAYERS" ]; then
         export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation:VK_LAYER_LS_frame_generation:$VK_INSTANCE_LAYERS"
     else

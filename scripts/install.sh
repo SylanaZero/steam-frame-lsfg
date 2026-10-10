@@ -49,10 +49,12 @@ fi
 # 5. Install Launch Wrapper
 chmod +x "$SCRIPT_DIR/lsfg-frame"
 cp "$SCRIPT_DIR/lsfg-frame" "$HOME/.local/bin/lsfg-frame"
+chmod +x "$HOME/.local/bin/lsfg-frame"
 
-# Create standard user shortcut: ~/lsfg
-ln -sf "$SCRIPT_DIR/lsfg-frame" "$HOME/lsfg"
-echo "Launch wrapper installed to: $HOME/lsfg"
+# Create standard user shortcut: ~/lsfg pointing to permanent installed copy
+ln -sf "$HOME/.local/bin/lsfg-frame" "$HOME/lsfg"
+echo "Launch wrapper installed to: $HOME/.local/bin/lsfg-frame"
+echo "User shortcut created:       $HOME/lsfg"
 
 # 6. Optional Decky Loader Integration
 DECKY_PLUGIN_DIR="$HOME/homebrew/plugins"
