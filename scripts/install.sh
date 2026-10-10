@@ -19,14 +19,35 @@ mkdir -p "$VULKAN_LAYER_DIR"
 mkdir -p "$LIB_DIR"
 mkdir -p "$HOME/.local/bin"
 
-# 2. Deploy bundled Lossless.dll if included in package
-if [ -f "$ROOT_DIR/Lossless.dll" ]; then
-    echo "Installing bundled Lossless.dll..."
+# 2. Check for Lossless.dll in Steam libraries; deploy bundled fallback only if not present
+EXISTING_DLL=""
+SEARCH_PATHS=(
+    "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/Lossless.dll"
+    "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
+    "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
+    "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
+    "/run/media/*/steamapps/common/Lossless Scaling/Lossless.dll"
+    "/run/media/*/*/steamapps/common/Lossless Scaling/Lossless.dll"
+)
+for p in "${SEARCH_PATHS[@]}"; do
+    for match in $p; do
+        if [ -f "$match" ]; then
+            EXISTING_DLL="$match"
+            break 2
+        fi
+    done
+done
+
+if [ -n "$EXISTING_DLL" ]; then
+    echo "Existing Lossless.dll detected: $EXISTING_DLL"
+    [ ! -f "$LIB_DIR/Lossless.dll" ] && cp "$EXISTING_DLL" "$LIB_DIR/Lossless.dll"
+elif [ -f "$ROOT_DIR/Lossless.dll" ]; then
+    echo "No existing Steam Lossless.dll found. Deploying bundled fallback Lossless.dll..."
     cp "$ROOT_DIR/Lossless.dll" "$LIB_DIR/Lossless.dll"
     STEAM_DIR="$HOME/.local/share/Steam/steamapps/common/Lossless Scaling"
     mkdir -p "$STEAM_DIR"
     cp "$ROOT_DIR/Lossless.dll" "$STEAM_DIR/Lossless.dll"
-    echo "Lossless.dll deployed to: $STEAM_DIR/Lossless.dll"
+    echo "Lossless.dll deployed to: $LIB_DIR/Lossless.dll"
 fi
 
 # 3. Run Environment Verification

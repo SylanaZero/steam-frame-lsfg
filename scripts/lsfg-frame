@@ -78,9 +78,17 @@ if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
         done
     done
 
-    # Fallback deep search if still not found
+    # Fallback deep search across Steam directories if still not found
     if [ -z "$DLL_PATH" ]; then
         DLL_PATH=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" 2>/dev/null | head -n1 || true)
+    fi
+
+    # Fallback: check package root directory last
+    if [ -z "$DLL_PATH" ]; then
+        WRAPPER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || true)"
+        if [ -n "$WRAPPER_ROOT" ] && [ -f "$WRAPPER_ROOT/Lossless.dll" ]; then
+            DLL_PATH="$WRAPPER_ROOT/Lossless.dll"
+        fi
     fi
 fi
 

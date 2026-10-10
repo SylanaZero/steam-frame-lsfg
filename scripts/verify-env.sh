@@ -65,7 +65,6 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # 5. Search for Lossless.dll in Steam Libraries
 echo "[5/6] Searching for licensed Lossless.dll in Steam libraries..."
 SEARCH_PATHS=(
-    "$ROOT_DIR/Lossless.dll"
     "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/Lossless.dll"
     "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
@@ -94,9 +93,14 @@ for p in "${SEARCH_PATHS[@]}"; do
     done
 done
 
-# Fallback deep search if still not found
+# Fallback deep search across Steam directories if still not found
 if [ -z "$FOUND_DLL" ]; then
     FOUND_DLL=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" 2>/dev/null | head -n1 || true)
+fi
+
+# Fallback: check bundled DLL in package root directory last
+if [ -z "$FOUND_DLL" ] && [ -f "$ROOT_DIR/Lossless.dll" ]; then
+    FOUND_DLL="$ROOT_DIR/Lossless.dll"
 fi
 
 if [ -n "$FOUND_DLL" ]; then
