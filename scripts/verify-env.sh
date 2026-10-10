@@ -33,16 +33,19 @@ fi
 
 # 3. Vulkan Driver / Turnip Check
 echo -n "[3/6] Checking Vulkan & Mesa Turnip Driver: "
-if command -v vulkaninfo &>/dev/null; then
+AURORA_ICD="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/drivers/freedreno_icd.aarch64.json"
+if [ -f "$AURORA_ICD" ]; then
+    echo -e "${COLOR_GREEN}PASS (Balemuni's Aurora Turnip driver active)${COLOR_RESET}"
+elif command -v vulkaninfo &>/dev/null; then
     VK_DRIVER=$(vulkaninfo --summary 2>/dev/null | grep -i "driverName" || true)
     if echo "$VK_DRIVER" | grep -qi "turnip\|freedreno"; then
-        echo -e "${COLOR_GREEN}PASS (Mesa Turnip detected)${COLOR_RESET}"
+        echo -e "${COLOR_GREEN}PASS (Mesa Turnip detected: ${VK_DRIVER})${COLOR_RESET}"
     else
         echo -e "${COLOR_YELLOW}PASS (Vulkan available: ${VK_DRIVER:-Generic})${COLOR_RESET}"
     fi
 else
     if [ -f "/usr/lib/libvulkan_freedreno.so" ] || [ -f "/usr/lib64/libvulkan_freedreno.so" ] || [ -f "/usr/lib/aarch64-linux-gnu/libvulkan_freedreno.so" ]; then
-        echo -e "${COLOR_GREEN}PASS (Mesa Turnip library located on system)${COLOR_RESET}"
+        echo -e "${COLOR_GREEN}PASS (System Mesa Turnip library located)${COLOR_RESET}"
     else
         echo -e "${COLOR_YELLOW}WARNING: vulkaninfo not found. Ensure mesa-vulkan-drivers or vulkan-tools is installed.${COLOR_RESET}"
     fi
