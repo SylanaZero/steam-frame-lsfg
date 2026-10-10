@@ -66,15 +66,41 @@ echo "Default game profiles installed to $CONFIG_DIR/profiles/"
 
 # 5. Install Vulkan Layer Library and Manifests
 echo "Installing Vulkan Layer binary and manifests..."
+# Remove legacy/conflicting layer manifests
+rm -f "$VULKAN_LAYER_DIR/VkLayer_lsfg.json"
+rm -f "$LIB_DIR/libVkLayer_lsfg.so"
+
 if [ -f "$ROOT_DIR/layer/liblsfg-vk-layer.so" ]; then
     cp "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$LIB_DIR/liblsfg-vk-layer.so"
-    cp "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$LIB_DIR/libVkLayer_lsfg.so"
+    cp "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$VULKAN_LAYER_DIR/liblsfg-vk-layer.so"
 fi
-if [ -f "$ROOT_DIR/layer/VkLayer_LSFGVK_frame_generation.json" ]; then
-    cp "$ROOT_DIR/layer/VkLayer_LSFGVK_frame_generation.json" "$VULKAN_LAYER_DIR/VkLayer_LSFGVK_frame_generation.json"
-fi
-if [ -f "$ROOT_DIR/layer/VkLayer_lsfg.json" ]; then
-    cp "$ROOT_DIR/layer/VkLayer_lsfg.json" "$VULKAN_LAYER_DIR/VkLayer_lsfg.json"
+
+# Write canonical Vulkan 1.3 layer manifest with absolute library path
+cat <<EOF > "$VULKAN_LAYER_DIR/VkLayer_LSFGVK_frame_generation.json"
+{
+  "file_format_version": "1.1.0",
+  "layer": {
+    "name": "VK_LAYER_LSFGVK_frame_generation",
+    "description": "Lossless Scaling frame generation layer",
+    "implementation_version": "2",
+    "library_path": "$LIB_DIR/liblsfg-vk-layer.so",
+    "type": "GLOBAL",
+    "api_version": "1.3.0",
+    "enable_environment": {
+      "ENABLE_LSFG": "1"
+    },
+    "disable_environment": {
+      "DISABLE_LSFGVK": "1"
+    }
+  }
+}
+EOF
+
+# Clean up any custom Turnip driver overrides (e.g. from install-turnip-aurora.sh)
+# to ensure Valve's native SteamOS Turnip driver is used
+if [ -d "$HOME/.local/share/steam-frame-lsfg/drivers" ]; then
+    echo "Restoring native SteamOS Mesa Turnip driver (removing custom driver override)..."
+    rm -rf "$HOME/.local/share/steam-frame-lsfg/drivers"
 fi
 
 # 6. Install Launch Wrapper

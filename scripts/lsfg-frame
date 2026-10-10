@@ -112,21 +112,13 @@ if [ "$ENABLED" -eq 1 ]; then
     export VK_LAYER_PATH="$LAYER_MANIFEST_DIR:${VK_LAYER_PATH:-}"
 
     if [ -n "$VK_INSTANCE_LAYERS" ]; then
-        export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation:VK_LAYER_LS_frame_generation:$VK_INSTANCE_LAYERS"
+        export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation:$VK_INSTANCE_LAYERS"
     else
-        export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation:VK_LAYER_LS_frame_generation"
+        export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation"
     fi
 
-    # Qualcomm Adreno 750 / Turnip optimizations
-    export TU_DEBUG="noconform"
+    # Native SteamOS Mesa Turnip presentation optimization
     export MESA_VK_WSI_PRESENT_MODE="mailbox"
-
-    # Custom Turnip driver override (e.g., Balemuni's Aurora Universal build)
-    AURORA_ICD="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/drivers/freedreno_icd.aarch64.json"
-    if [ -f "$AURORA_ICD" ]; then
-        export VK_ICD_FILENAMES="$AURORA_ICD"
-        echo "[SteamFrame-LSFG] Prioritizing custom Turnip driver: $AURORA_ICD"
-    fi
 
     echo "[SteamFrame-LSFG] Active for AppID $APP_ID | Multiplier: ${MULTIPLIER}x | Flow: $FLOW_SCALE | PerfMode: $PERF_MODE"
 else
