@@ -99,7 +99,19 @@ fi
 
 # 3. Export Environment Variables for Vulkan Layer & Turnip
 if [ "$ENABLED" -eq 1 ]; then
+    # Upstream lsfg-vk layer configuration variables
     export ENABLE_LSFG=1
+    export LSFGVK_ENV=1
+    export LSFGVK_CONFIG="$TARGET_CONFIG"
+    export LSFGVK_DLL_PATH="$DLL_PATH"
+    export LSFGVK_MULTIPLIER="$MULTIPLIER"
+    export LSFGVK_FLOW_SCALE="$FLOW_SCALE"
+    export LSFGVK_PERFORMANCE_MODE="$PERF_MODE"
+    export LSFGVK_LOG_LEVEL="info"
+    LOG_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lsfg.log"
+    export LSFGVK_LOG_FILE="$LOG_FILE"
+
+    # Legacy environment variables fallback
     export LSFG_MULTIPLIER="$MULTIPLIER"
     export LSFG_FLOW_SCALE="$FLOW_SCALE"
     export LSFG_PERFORMANCE_MODE="$PERF_MODE"

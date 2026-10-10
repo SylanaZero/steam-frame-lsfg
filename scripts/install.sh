@@ -64,6 +64,10 @@ fi
 cp -r "$ROOT_DIR/config/profiles/"* "$CONFIG_DIR/profiles/"
 echo "Default game profiles installed to $CONFIG_DIR/profiles/"
 
+# Upstream lsfg-vk config path symlink
+mkdir -p "$HOME/.config/lsfg-vk"
+ln -sf "$CONFIG_DIR/config.toml" "$HOME/.config/lsfg-vk/conf.toml"
+
 # 5. Install Vulkan Layer Library and Manifests
 echo "Installing Vulkan Layer binary and manifests..."
 # Remove legacy/conflicting layer manifests
