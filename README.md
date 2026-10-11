@@ -164,6 +164,20 @@ This project's tooling, scripts, configuration, and documentation are licensed u
 
 ---
 
+## 🙏 Acknowledgements & Credits
+
+This project builds upon the pioneering work of the open-source Linux gaming and handheld emulation communities:
+
+* **[PancakeTAS](https://git.lsfg-vk.dev/lsfg-vk.git)**: Creator of `lsfg-vk`, the foundational Vulkan compatibility layer that makes frame generation possible on Linux.
+* **[xXJSONDeruloXx](https://github.com/xXJSONDeruloXx/decky-lsfg-vk)**: Author of `decky-lsfg-vk`, which established the Decky Loader UI integration and configuration model.
+* **[ArmadaOS Project](https://github.com/armada-os/armada)** *(and community contributors Janleyx & BakaPute)*: For groundbreaking work pioneering SteamOS on ARM64 and proving that Lossless Scaling could run on Qualcomm Snapdragon processors.
+* **[Balemuni](https://github.com/Balemuni/Balemunis-Aurora)**: Creator of the Aurora Turnip driver packages used for experimental Adreno Vulkan driver testing.
+* **[Mesa 3D & Freedreno Team](https://docs.mesa3d.org/drivers/freedreno.html)**: The developers behind the open-source `freedreno_turnip` driver providing Vulkan 1.3 support on Qualcomm Adreno GPUs.
+* **[Decky Loader Team](https://github.com/SteamDeckHomebrew/decky-loader)**: For the homebrew plugin framework enabling seamless SteamOS Quick Access Menu integration.
+* **[THS](https://store.steampowered.com/app/993090/Lossless_Scaling/)**: Developer of the original Lossless Scaling software and optical flow frame generation technology on Steam.
+
+---
+
 ## ⚠️ Disclaimer
 
 This is an independent open-source community project. It is not affiliated with, sponsored by, or endorsed by Valve Corporation, Qualcomm, or THS. Valve, Steam, and Steam Frame are trademarks or registered trademarks of Valve Corporation. All other trademarks are property of their respective owners.
