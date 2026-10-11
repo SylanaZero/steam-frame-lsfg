@@ -2,6 +2,7 @@
   "name": "steam-frame-lsfg",
   "version": "1.0.0",
   "description": "Decky plugin for Lossless Scaling Frame Generation on Steam Frame",
+  "license": "MIT",
   "scripts": {
     "build": "rollup -c"
   },

@@ -153,3 +153,11 @@ Parameters:
 * `flow_scale`: Optical flow resolution scale (`0.75` = 75%, `1.0` = full resolution).
 * `performance_mode`: `true` for fast FP16 compute shaders, `false` for FP32.
 * `override_present_mode`: `false` (recommended default for flicker-free presentation).
+
+---
+
+## 📄 License
+
+This project's tooling, scripts, configuration, and documentation are licensed under the [MIT License](LICENSE).
+* **Lossless Scaling**: Proprietary software developed by THS (available on Steam, App ID `993090`).
+* **`lsfg-vk`**: The upstream Vulkan compatibility layer submodule is licensed under CC BY-NC-ND 4.0 by PancakeTAS.
