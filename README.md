@@ -187,3 +187,73 @@ This project builds upon the pioneering work of the open-source Linux gaming and
 ## ⚠️ Disclaimer
 
 This is an independent open-source community project. It is not affiliated with, sponsored by, or endorsed by Valve Corporation, Qualcomm, or THS. Valve, Steam, and Steam Frame are trademarks or registered trademarks of Valve Corporation. All other trademarks are property of their respective owners.
+
+---
+
+## Repository owner's message
+
+This repository exists because I wanted to enable frame generation on the Steam Frame and couldn't find any existing projects to do so.  I don't have the skills to do this, so I asked `Gemini 3.8 Flash High` through Antigravity IDE to take a look at existing open source projects and see if it could figure out how to enable LSFG on Steam Frame given that frame generation has already been proven to work on Snapdragon 8 processors through projects such as ArmadaOS, GameNative, etc.  It took about 9 hours of back-and-forth testing, log generation, and analysis for LSFG to work successfully on a handful of titles (Scarlet Nexus, Jedi: Fallen Order, and Wow: Forever).  I can't tell you if it'll work on your favorite game, but as a proof of concept, it works.  I've tried to provide as much of the generated files and documentation as I can so others can pick up this work and improve it in ways I cannot.
+
+I've never published anything open source before, so please be gentle with feedback.
+
+Here's the prompt I used to kick off this project:
+
+```
+Let's create a new project.
+
+I'd like to see about adding Lossless Scaling Frame Generation (LSFG) support to the Valve "Steam Frame".  It's currently supported on the Steam Deck, but I can't find any projects that enable it on the Steam Frame, which is running on an ARM64 processor (Snapdragon 8, Gen 3 with an Adreno 750 GPU).  
+
+1. On the Steam Deck, you would typically purchase Lossless Scaling:
+https://store.steampowered.com/app/993090/Lossless_Scaling/
+
+2. Then install the Decky Loader:
+https://github.com/steamdeckhomebrew/decky-loader
+
+3. Then install the decky-lsfg-vk Decky plugin
+https://github.com/xXJSONDeruloXx/decky-lsfg-vk
+
+4. Then you would add the following string to the Launch Options of an individual game before launching it which would enable frame generation:
+~/lsfg %command%
+
+However, there is a version of SteamOS that has been adapted to ARM64 Platforms like the AYN Thor (Snapdragon 8, Gen 2) and the AYN Odin 3 (Snapdragon 8 Elite, Gen 5) called ArmadaOS.  They've managed to add decky-lsfg-vk support to this ARM64 version of SteamOS.
+https://github.com/armada-os/armada
+
+There are also ARM64 compatible android apps that enable LSFG framegen like:
+GameNative: https://github.com/utkarshdalal/GameNative
+DroidDeck: https://github.com/Droid-Deck/DroidDeck
+
+What would be the best way to go about adding lsfg-vk support to the Steam Frame?  
+
+1. Updating decky-loader to be compatible with Steam Frame and then loading lsfg-vk?
+2. Creating a standalone plugin that can be run per app on the Steam Frame?
+3. Something else?
+```
+
+Antigravity responded:
+
+```
+Analysis of Your Three Options
+
+Option 1: Updating Decky Loader to be compatible, then loading lsfg-vk
+Verdict: Necessary for GUI convenience, but insufficient on its own.
+Why: Decky Loader is strictly a frontend UI plugin manager injecting into Steam’s Chromium Embedded Framework (CEF). It does not intercept graphics calls or execute Vulkan layers. Even if Decky Loader is ported to Steam Frame (which is straightforward since its Python backend already runs on ARM64 platforms like ArmadaOS), you still need the underlying native ARM64 Vulkan layer (libVkLayer_lsfg.so) and driver hooks. Furthermore, Decky Loader frequently breaks whenever Valve updates SteamOS/CEF.
+
+Option 2: Creating a standalone plugin / wrapper that runs per app
+Verdict: Essential for rock-solid reliability.
+Why: Wrapping game execution via launch options (~/lsfg %command%) or hooking into Proton directly bypasses the Steam UI layer entirely. It communicates directly with Vulkan and FEX-Emu/Proton via environment variables (ENABLE_LSFG=1, VK_INSTANCE_LAYERS=VK_LAYER_LS_frame_generation). However, its drawback is that players cannot adjust multipliers or flow scale on the fly without exiting the game.
+Option 3: The Recommended Strategy — Hybrid Dual-Tier Architecture
+
+Following the lessons from ArmadaOS (e.g., Janleyx/decky-lsfg-vk-for-Ayn-Odin-2 and BakaPute/ArmadaLSFG) and GameNative/DroidDeck, the gold standard is decoupling the engine from the UI:
+
+Tier 1 (Core Engine & Wrapper):
+A native ARM64 Vulkan layer (libVkLayer_lsfg.so + VkLayer_lsfg.json).
+Snapdragon 8 Gen 3 / Adreno 750 Tuning: Enforces FP16 half-precision compute shaders on Adreno ALUs and bypasses GMEM tile stall penalties (direct_rendering = true) in the Mesa Turnip driver.
+Automatic Lossless.dll Linking: Scans Steam libraries for the user's purchased copy of Lossless Scaling (App ID 993090) to load the proprietary model legally.
+Launch Wrapper: scripts/lsfg-frame, invoked as ~/lsfg %command% with support for per-game TOML profiles.
+
+Tier 2 (Optional In-Game Control Surface):
+A dedicated Steam Frame LSFG Decky Plugin (decky-plugin/) that reads and modifies the exact same configuration files in real time.
+Lets players toggle frame generation and switch multipliers (2x, 3x, 4x) directly in the Quick Access Menu (QAM) while playing. If Decky is disabled or broken by a Steam update, the core system continues working seamlessly.
+```
+
+...and we proceeded from there.  I never got Decky to work on the Steam Frame, but Antigravity/Gemini still ended up generating a decky-plugin anyway (I have no idea if it works).
