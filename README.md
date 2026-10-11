@@ -158,9 +158,15 @@ Parameters:
 
 ## 📄 License
 
-This project's tooling, scripts, configuration, and documentation are licensed under the [MIT License](LICENSE).
+This project's original tooling, scripts, configuration, and documentation are licensed under the [MIT License](LICENSE).
 * **Lossless Scaling**: Proprietary software developed by THS (available on Steam, App ID `993090`).
-* **`lsfg-vk`**: The upstream Vulkan compatibility layer submodule is licensed under CC BY-NC-ND 4.0 by PancakeTAS.
+* **`lsfg-vk`**: Upstream Vulkan compatibility layer licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) by PancakeTAS.
+
+### ⚠️ Upstream Binary & Distribution Notice
+* The prebuilt Vulkan layer binary (`liblsfg-vk-layer.so`) included in release archives is built from [PancakeTAS's lsfg-vk](https://git.lsfg-vk.dev/lsfg-vk.git).
+* **Modifications:** Incorporates a multi-API shader resource offset patch for ARM64 and multi-runtime DLL compatibility. The full patch is transparently provided in [`patches/0001-steam-frame-lsfg-pipeline-offset-detection.patch`](patches/0001-steam-frame-lsfg-pipeline-offset-detection.patch).
+* **Non-Commercial / Accessibility Intent:** Provided free of charge strictly as an unmonetized convenience build for handheld community testing and accessibility (avoiding the need for users to set up an aarch64 cross-compilation toolchain on SteamOS).
+* **Removal Policy:** If the upstream author ([PancakeTAS](https://git.lsfg-vk.dev/lsfg-vk.git)) prefers that precompiled patched binaries not be distributed directly, please open an issue or reach out, and the prebuilt binaries will be immediately replaced with automated source-build scripts.
 
 ---
 

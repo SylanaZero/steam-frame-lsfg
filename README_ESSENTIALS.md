@@ -39,5 +39,12 @@ Built upon upstream work by **PancakeTAS** (`lsfg-vk`), **xXJSONDeruloXx** (`dec
 
 ---
 
+## 📄 License & Upstream Binary Notice
+- **Project tooling & scripts**: [MIT License](https://opensource.org/licenses/MIT).
+- **Upstream Vulkan Layer (`liblsfg-vk-layer.so`)**: Built from [PancakeTAS's lsfg-vk](https://git.lsfg-vk.dev/lsfg-vk.git), licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/). Includes the non-commercial multi-API resource offset patch for ARM64 convenience. Provided free of charge for community accessibility; if the upstream author prefers that prebuilt patched binaries not be distributed directly, they will be removed upon request.
+- **Lossless Scaling**: Proprietary software developed by THS (Steam App ID `993090`).
+
+---
+
 ## ⚠️ Disclaimer
 This is an independent open-source community project. It is not affiliated with, sponsored by, or endorsed by Valve Corporation, Qualcomm, or THS. Valve, Steam, and Steam Frame are trademarks or registered trademarks of Valve Corporation.
