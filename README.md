@@ -9,104 +9,147 @@ A dedicated, hardware-optimized project providing **Lossless Scaling Frame Gener
 
 ---
 
-## 🎯 Architectural Overview: Which Approach is Best?
+## 📁 Package Contents & File Reference
 
-When bringing `lsfg-vk` to the Valve Steam Frame, three strategies were evaluated:
+This release archive contains everything needed for one-click installation, plus diagnostic and developer tools:
 
-### 1. Updating Decky Loader to be compatible and loading `lsfg-vk`
-* **Assessment**: Necessary for the best user experience (in-game QAM sliders), but **insufficient on its own**. Decky Loader is merely a UI injection layer into Steam's CEF interface. It cannot intercept Vulkan draw/present calls without the underlying native ARM64 Vulkan layer (`libVkLayer_lsfg.so`). Relying solely on Decky also causes breaks every time Valve updates the Steam Client.
-
-### 2. Creating a standalone plugin that runs per-app (`~/lsfg %command%`)
-* **Assessment**: Extremely robust and resilient to Steam updates. It interfaces directly with Vulkan, Proton, and FEX-Emu via environment variables (`ENABLE_LSFG=1`, `VK_INSTANCE_LAYERS=VK_LAYER_LS_frame_generation`). However, adjusting settings requires quitting the game to edit text config files.
-
-### 3. The Recommended Solution: Hybrid Dual-Tier Architecture
-This repository implements a **Hybrid Dual-Tier Architecture**:
-* **Tier 1 (Core Engine & Wrapper)**: A native ARM64 Vulkan layer with Adreno 750 / Turnip optimizations, auto-detection for licensed `Lossless.dll`, per-AppID TOML profiles, and a robust standalone launcher (`~/lsfg %command%`).
-* **Tier 2 (Control Surface)**: A native Decky Loader plugin for Steam Frame that interfaces with the same configuration files, allowing on-the-fly toggling and multiplier adjustments from the Steam Quick Access Menu (QAM) without quitting your game.
-
----
-
-## 📦 Project Structure
-
-```
+```text
 steam-frame-lsfg/
-├── README.md                      # Complete setup and user guide
-├── docs/
-│   └── ARCHITECTURE.md            # In-depth architectural analysis & driver deep-dive
-├── layer/
-│   └── VkLayer_lsfg.json          # Vulkan Layer specification manifest (ARM64)
-├── scripts/
-│   ├── install.sh                 # One-click installation & deployment script
-│   ├── lsfg-frame                 # Production launch wrapper (~/lsfg)
-│   └── verify-env.sh              # System diagnostic & environment check script
+├── QUICKSTART.md                     # Step-by-step setup guide for Steam Frame
+├── README.md                         # Project documentation and component reference
 ├── config/
-│   ├── config.default.toml        # Adreno 750 tuned global configuration
-│   └── profiles/                  # Per-game AppID optimization profiles
-│       ├── default.toml
-│       ├── 1091500.toml           # Cyberpunk 2077
-│       └── 1145360.toml           # Hades II
-└── decky-plugin/                  # Optional Decky Loader Quick Access Menu UI
-    ├── plugin.json
-    ├── package.json
-    ├── main.py                    # Python backend managing configs & AppIDs
-    └── src/
-        └── index.tsx              # React UI for SteamOS Gamepad QAM
+│   ├── config.default.toml           # Global configuration template (Schema Version 2)
+│   └── profiles/                     # Per-game optimization profiles
+│       ├── default.toml              # Fallback profile for all Proton/Windows titles
+│       ├── 1091500.toml              # Profile: Cyberpunk 2077
+│       └── 1145360.toml              # Profile: Hades II
+├── decky-plugin/                     # Optional Decky Loader Quick Access Menu UI
+│   ├── plugin.json / package.json    # Decky manifest and metadata
+│   ├── main.py                       # Python backend managing configs & AppIDs
+│   └── src/index.tsx                 # React UI for SteamOS Gamepad QAM
+├── docs/
+│   ├── ARCHITECTURE.md               # Technical hardware deep-dive for developers
+│   └── REPLICATION_GUIDE.md          # Step-by-step build & replication guide
+├── layer/
+│   ├── liblsfg-vk-layer.so           # Pre-compiled ARM64 Vulkan layer binary
+│   └── VkLayer_LSFGVK_frame_generation.json # Vulkan 1.3 layer manifest
+└── scripts/
+    ├── install.sh                    # [Core] Primary installer script
+    ├── lsfg-frame                    # [Core] Production launch wrapper (~/lsfg)
+    ├── verify-env.sh                 # [Core] System diagnostic & environment check script
+    ├── smoke-test-layer.sh           # [Diagnostics] 4-point Vulkan layer registration test
+    ├── build-cross-layer.sh          # [Developer] Recompilation script (ARM64 or x86_64 host)
+    └── install-turnip-aurora.sh      # [Experimental] Alternative Turnip driver installer
 ```
+
+### Detailed Component Reference
+
+| File / Component | Category | Purpose & Description |
+| :--- | :--- | :--- |
+| **`scripts/install.sh`** | **Core Installer** | **Primary installation script.** Deploys the layer library to `~/.local/share/steam-frame-lsfg/lib/`, writes Vulkan loader manifests, sets up default configuration profiles, and installs the `~/lsfg` launcher wrapper. |
+| **`scripts/lsfg-frame`** | **Core Runtime** | **Launch wrapper.** Installed to `~/lsfg` and `/usr/local/bin/lsfg-frame`. Handles `Lossless.dll` auto-discovery, per-game TOML profile resolution, and flicker-free presentation pacing. |
+| **`layer/liblsfg-vk-layer.so`** | **Core Binary** | **Compiled ARM64 Vulkan layer.** Stripped 2.4 MB binary compiled with the Lossless Scaling v3.2.2.0 SPIR-V resource offset fix, Adreno 750 compute optimizations, and Vulkan 1.3 swapchain wrapping. |
+| **`layer/VkLayer_LSFGVK_frame_generation.json`** | **Core Runtime** | **Vulkan layer manifest.** Registered with SteamOS's Vulkan loader (`implicit_layer.d` and `explicit_layer.d`) so the layer can intercept swapchain calls. |
+| **`scripts/verify-env.sh`** | **Diagnostics** | **Environment verifier.** Checks CPU architecture, Qualcomm Snapdragon 8 Gen 3 core clusters, Mesa Turnip driver status, FEX-Emu, and Steam libraries. (Run automatically by `install.sh`). |
+| **`scripts/smoke-test-layer.sh`** | **Diagnostics** | **Quick diagnostic test.** Validates the ARM64 ELF header of `liblsfg-vk-layer.so`, checks manifest syntax, and tests Vulkan loader discovery via `vulkaninfo` without launching a game. |
+| **`scripts/build-cross-layer.sh`** | **Developer Tool** | **Recompilation script.** Clones upstream `lsfg-vk` and builds `liblsfg-vk-layer.so` from source. Supports cross-compiling on x86_64 Linux/WSL with `aarch64-linux-gnu-g++` or compiling natively on ARM64. |
+| **`scripts/install-turnip-aurora.sh`** | **Experimental Tool** | **Alternative driver installer.** Downloads and installs community Balemuni Aurora Turnip driver builds into `~/.local/share/steam-frame-lsfg/drivers/` for testing bleeding-edge driver fixes. |
+| **`config/config.default.toml`** | **Configuration** | **Default configuration template.** Deployed to `~/.config/steam-frame-lsfg/config.toml`. Pre-tuned with `override_present_mode = false` and `mailbox` presentation for smooth, flicker-free delivery. |
+| **`config/profiles/*.toml`** | **Configuration** | **Per-game optimization profiles.** Game-specific presets deployed by the installer (`1091500.toml` for Cyberpunk 2077, `1145360.toml` for Hades II, `default.toml`). |
+| **`decky-plugin/`** | **Optional UI** | **Decky Loader plugin.** Provides an on-screen Quick Access Menu (QAM) slider panel for adjusting multipliers, optical flow scale, and performance mode on the fly. |
+| **`docs/ARCHITECTURE.md`** | **Documentation** | **Hardware architecture guide.** Comprehensive technical documentation on Snapdragon 8 Gen 3, Adreno 750 GMEM tile memory, memory bandwidth constraints, and Gamescope WSI. |
+| **`docs/REPLICATION_GUIDE.md`** | **Documentation** | **Build & replication guide.** Step-by-step developer guide documenting cross-compilation toolchains, shader resource reverse-engineering, and presentation pacing patches. |
+| **`QUICKSTART.md`** | **Documentation** | **Quickstart guide.** Step-by-step instructions for extracting, installing, and configuring Steam launch options. |
 
 ---
 
 ## 🚀 Quickstart Guide
 
 ### Step 1: Prerequisites
-1. **Lossless Scaling Ownership**: Purchase and download [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) on Steam. The proprietary `Lossless.dll` model is required and legally verified from your local Steam library.
-2. **Proton ARM64 & FEX-Emu**: Pre-installed on SteamOS for Steam Frame.
+1. **Lossless Scaling Ownership**: Purchase and download [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) on Steam.
+   * *Branch Note*: The standard branch provides `Lossless.dll`; the `lsfg-vk` beta branch (Properties $\to$ Betas) provides `lsfg-vk.dll`. The installer automatically searches for either and mirrors both names so either branch works out of the box.
+2. **Valve Steam Frame**: Running SteamOS ARM64 with native Mesa Turnip Vulkan driver.
 
 ### Step 2: Installation
-Clone or copy this project to your Steam Frame and run:
+Download or transfer `steam-frame-lsfg-release.zip` to your Steam Frame, extract into a dedicated directory, and run:
+
 ```bash
+unzip -o steam-frame-lsfg-release.zip -d steam-frame-lsfg
 cd steam-frame-lsfg
-chmod +x scripts/*.sh scripts/lsfg-frame
-./scripts/install.sh
+bash scripts/install.sh
 ```
 
 The installer will:
-1. Validate ARM64 architecture and detect your Snapdragon 8 Gen 3 / Turnip driver.
-2. Locate `Lossless.dll` in your Steam directories (`~/.steam/steam/steamapps/common/...`).
-3. Deploy the Vulkan layer manifest to `~/.local/share/vulkan/implicit_layer.d/`.
+1. Verify the ARM64 environment and Mesa Turnip Vulkan driver.
+2. Locate `Lossless.dll` / `lsfg-vk.dll` in your Steam library directories and mirror both into place.
+3. Deploy the pre-compiled Vulkan layer to `~/.local/share/vulkan/implicit_layer.d/` and explicit layer directories.
 4. Install the launch wrapper to `~/lsfg` and `~/.local/bin/lsfg-frame`.
-5. Automatically detect and deploy the Decky Loader plugin if Decky is installed.
+5. Deploy the Decky Loader plugin if Decky is installed.
 
 ### Step 3: Enabling in Games
+
 In the Steam client:
-1. Navigate to your desired game -> **Settings / Properties**.
-2. In **Launch Options**, prepend the wrapper:
-   ```bash
+1. Right-click your game $\to$ **Properties**.
+2. Under **Launch Options**, enter:
+   ```text
    ~/lsfg %command%
    ```
+   *(or `/home/steamos/lsfg %command%`)*
 3. Launch the game!
 
----
-
-## ⚙️ Snapdragon 8 Gen 3 & Adreno 750 Optimization
-
-Steam Frame features dual 2160 × 2160 displays operating at **72 Hz, 90 Hz, 120 Hz, or 144 Hz**. This project includes hardware-specific tuning in `config/config.default.toml`:
-
-| Setting | Recommended Value | Rationale |
-| :--- | :--- | :--- |
-| **`multiplier`** | `2` (or `3`) | Converts 45 FPS -> 90 FPS, 60 FPS -> 120 FPS, or 72 FPS -> 144 FPS. |
-| **`flow_scale`** | `0.75` | Computes optical flow at 75% resolution to save memory bandwidth while preserving edges. |
-| **`performance_mode`**| `true` | Enforces FP16 half-precision ALU compute, cutting shader execution time in half on Adreno 750. |
-| **`TU_DEBUG`** | `noconform` | Avoids conformance overhead in Mesa Turnip for custom swapchain presentations. |
-| **`direct_rendering`**| `true` | Bypasses GMEM tile memory for full-screen frame generation passes, avoiding tile stall penalty. |
-
----
-
-## 🛠️ Diagnostics & Troubleshooting
-
-Run the verification tool to diagnose any configuration issues:
-```bash
-./scripts/verify-env.sh
+#### For Non-Steam Games & Custom Drivers (e.g., Battle.net / WoW Forever):
+Keep environment variables (like `VK_ICD_FILENAMES=...`) before `~/lsfg`:
+```text
+VK_ICD_FILENAMES=/path/to/custom_icd.json ~/lsfg %command%
 ```
 
-* **Game fails to start?** Check if `Lossless.dll` is properly detected by checking `~/.config/steam-frame-lsfg/config.toml`.
-* **High latency?** Set `performance_mode = true` and `flow_scale = 0.65` in the game's profile to reduce optical flow overhead.
+---
+
+## ⚙️ Recommended In-Game Settings (Flicker-Free & Smooth)
+
+To avoid compositor collisions and frame pacing judder:
+* **In-Game V-Sync**: **OFF** (the LSFG layer uses smooth Mailbox presentation).
+* **Display Mode**: **Borderless Windowed** (or Windowed Fullscreen).
+* **Motion Blur**: **OFF** (prevents optical flow motion blur noise).
+* **SteamOS Performance Overlay**: Set **Framerate Limit** to **Off / Unlimited**.
+
+---
+
+## 🛠️ Diagnostics & Debug Logging
+
+By default, disk logging is **disabled** to avoid generating large log files on your drive during extended gameplay.
+
+* **Enable Debug Logging for a Session**:
+  Launch the game with `LSFG_DEBUG=1`:
+  ```text
+  LSFG_DEBUG=1 ~/lsfg %command%
+  ```
+  Inspect logs:
+  ```bash
+  cat ~/.local/share/steam-frame-lsfg/lsfg.log
+  ```
+
+* **Verify System Health**:
+  ```bash
+  bash scripts/verify-env.sh
+  ```
+
+* **FP32 Quality Shader Mode**:
+  If you ever notice half-float precision shimmer on complex scenes, force FP32 shaders:
+  ```text
+  LSFGVK_PERFORMANCE_MODE=0 ~/lsfg %command%
+  ```
+
+---
+
+## 📁 Configuration
+
+Configuration files are located in `~/.config/steam-frame-lsfg/`:
+* Global configuration: `config.toml`
+* Per-game profiles: `profiles/<AppID>.toml` (e.g. `1091500.toml` for Cyberpunk 2077, `default.toml`)
+
+Parameters:
+* `multiplier`: Frame generation multiplier (`2` = 2x, `3` = 3x).
+* `flow_scale`: Optical flow resolution scale (`0.75` = 75%, `1.0` = full resolution).
+* `performance_mode`: `true` for fast FP16 compute shaders, `false` for FP32.
+* `override_present_mode`: `false` (recommended default for flicker-free presentation).

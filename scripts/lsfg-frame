@@ -9,15 +9,19 @@ set -e
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/steam-frame-lsfg"
 LOG_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg"
-mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/lsfg.log"
 
 GLOBAL_CONFIG="$CONFIG_DIR/config.toml"
-APP_ID="${SteamAppId:-0}"
+APP_ID="${SteamAppId:-${SteamGameId:-${STEAM_COMPAT_APP_ID:-0}}}"
+[ "$APP_ID" != "0" ] && export SteamAppId="$APP_ID"
 
-echo "=== Steam Frame LSFG Session: $(date) ===" > "$LOG_FILE"
-echo "AppID: $APP_ID" >> "$LOG_FILE"
-echo "Command: $@" >> "$LOG_FILE"
+# Debug logging: set LSFG_DEBUG=1 to enable detailed log capture in ~/.local/share/steam-frame-lsfg/lsfg.log
+if [ "${LSFG_DEBUG:-0}" = "1" ]; then
+    mkdir -p "$LOG_DIR"
+    echo "=== Steam Frame LSFG Session: $(date) ===" > "$LOG_FILE"
+    echo "AppID: $APP_ID" >> "$LOG_FILE"
+    echo "Command: $@" >> "$LOG_FILE"
+fi
 
 # 1. Profile Resolution
 TARGET_CONFIG="$GLOBAL_CONFIG"
@@ -30,6 +34,7 @@ ENABLED=1
 MULTIPLIER=2
 FLOW_SCALE=0.75
 PERF_MODE=1
+OVERRIDE_PRESENT=0
 DLL_PATH=""
 
 # Helper function to parse TOML keys
@@ -54,6 +59,10 @@ if [ -f "$TARGET_CONFIG" ]; then
     CFG_PERF=$(get_toml_val "$TARGET_CONFIG" "performance_mode")
     [ "$CFG_PERF" = "false" ] && PERF_MODE=0
     
+    CFG_OP=$(get_toml_val "$TARGET_CONFIG" "override_present_mode")
+    [ "$CFG_OP" = "true" ] && OVERRIDE_PRESENT=1
+    [ "$CFG_OP" = "false" ] && OVERRIDE_PRESENT=0
+
     CFG_DLL=$(get_toml_val "$TARGET_CONFIG" "dll_path")
     [ -n "$CFG_DLL" ] && DLL_PATH="$CFG_DLL"
 fi
@@ -88,21 +97,40 @@ if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
 
     # Fallback deep search across Steam directories if still not found
     if [ -z "$DLL_PATH" ]; then
-        DLL_PATH=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" 2>/dev/null | head -n1 || true)
+        DLL_PATH=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" -o -iname "lsfg-vk.dll" 2>/dev/null | head -n1 || true)
     fi
 
     # Fallback: check package root directory last
     if [ -z "$DLL_PATH" ]; then
         WRAPPER_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || true)"
-        if [ -n "$WRAPPER_ROOT" ] && [ -f "$WRAPPER_ROOT/Lossless.dll" ]; then
-            DLL_PATH="$WRAPPER_ROOT/Lossless.dll"
+        if [ -n "$WRAPPER_ROOT" ]; then
+            if [ -f "$WRAPPER_ROOT/Lossless.dll" ]; then
+                DLL_PATH="$WRAPPER_ROOT/Lossless.dll"
+            elif [ -f "$WRAPPER_ROOT/lsfg-vk.dll" ]; then
+                DLL_PATH="$WRAPPER_ROOT/lsfg-vk.dll"
+            fi
         fi
     fi
 fi
 
 if [ -z "$DLL_PATH" ] || [ ! -f "$DLL_PATH" ]; then
-    echo "[SteamFrame-LSFG] WARNING: Lossless.dll could not be located. Launching game without framegen."
+    echo "[SteamFrame-LSFG] WARNING: Framegen DLL could not be located. Launching game without framegen."
     exec "$@"
+fi
+
+# Ensure both Lossless.dll and lsfg-vk.dll exist alongside each other
+DLL_DIR="$(dirname "$DLL_PATH")"
+if [ -f "$DLL_DIR/Lossless.dll" ] && [ ! -f "$DLL_DIR/lsfg-vk.dll" ]; then
+    cp -f "$DLL_DIR/Lossless.dll" "$DLL_DIR/lsfg-vk.dll" 2>/dev/null || true
+elif [ -f "$DLL_DIR/lsfg-vk.dll" ] && [ ! -f "$DLL_DIR/Lossless.dll" ]; then
+    cp -f "$DLL_DIR/lsfg-vk.dll" "$DLL_DIR/Lossless.dll" 2>/dev/null || true
+fi
+
+LIB_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib"
+mkdir -p "$LIB_DIR"
+if [ -f "$DLL_PATH" ] && [ ! -f "$LIB_DIR/lsfg-vk.dll" ]; then
+    cp -f "$DLL_PATH" "$LIB_DIR/lsfg-vk.dll" 2>/dev/null || true
+    cp -f "$DLL_PATH" "$LIB_DIR/Lossless.dll" 2>/dev/null || true
 fi
 
 # 3. Export Environment Variables for Vulkan Layer & Turnip
@@ -112,43 +140,67 @@ if [ "$ENABLED" -eq 1 ]; then
     export LSFGVK_ENV=1
     export LSFGVK_CONFIG="$TARGET_CONFIG"
     export LSFGVK_DLL_PATH="$DLL_PATH"
-    export LSFGVK_MULTIPLIER="$MULTIPLIER"
-    export LSFGVK_FLOW_SCALE="$FLOW_SCALE"
-    export LSFGVK_PERFORMANCE_MODE="$PERF_MODE"
-    export LSFGVK_LOG_LEVEL="info"
-    LOG_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lsfg.log"
-    export LSFGVK_LOG_FILE="$LOG_FILE"
+    export LSFGVK_MULTIPLIER="${LSFGVK_MULTIPLIER:-$MULTIPLIER}"
+    export LSFGVK_FLOW_SCALE="${LSFGVK_FLOW_SCALE:-$FLOW_SCALE}"
+    export LSFGVK_PERFORMANCE_MODE="${LSFGVK_PERFORMANCE_MODE:-$PERF_MODE}"
+    export LSFGVK_OVERRIDE_PRESENT_MODE="${LSFGVK_OVERRIDE_PRESENT_MODE:-$OVERRIDE_PRESENT}"
+    # Debug logging: set LSFG_DEBUG=1 to record detailed runtime and loader logs
+    if [ "${LSFG_DEBUG:-0}" = "1" ]; then
+        export LSFGVK_LOG_LEVEL="info"
+        export LSFGVK_LOG_FILE="$LOG_FILE"
+        export VK_LOADER_DEBUG="error,warn,info"
+        echo "Resolved Lossless.dll: $DLL_PATH" >> "$LOG_FILE"
+        echo "Active Profile: $TARGET_CONFIG" >> "$LOG_FILE"
+        echo "Framegen Settings: ${LSFGVK_MULTIPLIER}x | Flow: $LSFGVK_FLOW_SCALE | PerfMode: $LSFGVK_PERFORMANCE_MODE" >> "$LOG_FILE"
+        echo "Layer Activated: $VK_INSTANCE_LAYERS" >> "$LOG_FILE"
+        echo "--- Game Runtime Log Output ---" >> "$LOG_FILE"
+    fi
 
     # Legacy environment variables fallback
-    export LSFG_MULTIPLIER="$MULTIPLIER"
-    export LSFG_FLOW_SCALE="$FLOW_SCALE"
-    export LSFG_PERFORMANCE_MODE="$PERF_MODE"
+    export LSFG_MULTIPLIER="$LSFGVK_MULTIPLIER"
+    export LSFG_FLOW_SCALE="$LSFGVK_FLOW_SCALE"
+    export LSFG_PERFORMANCE_MODE="$LSFGVK_PERFORMANCE_MODE"
     export LSFG_DLL_PATH="$DLL_PATH"
     
-    # Ensure Vulkan layer is explicitly enabled in instance and discovered
+    # Ensure Vulkan layer is discovered across both implicit and explicit locations
     LAYER_LIB_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib"
-    LAYER_MANIFEST_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d"
+    IMPLICIT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/implicit_layer.d"
+    EXPLICIT_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/vulkan/explicit_layer.d"
+    LAYER_PATHS="$IMPLICIT_DIR:$EXPLICIT_DIR"
+
     export LD_LIBRARY_PATH="$LAYER_LIB_DIR:${LD_LIBRARY_PATH:-}"
-    export VK_LAYER_PATH="$LAYER_MANIFEST_DIR:${VK_LAYER_PATH:-}"
+    export VK_LAYER_PATH="$LAYER_PATHS${VK_LAYER_PATH:+:$VK_LAYER_PATH}"
+    export VK_ADD_LAYER_PATH="$LAYER_PATHS${VK_ADD_LAYER_PATH:+:$VK_ADD_LAYER_PATH}"
 
     if [ -n "$VK_INSTANCE_LAYERS" ]; then
         export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation:$VK_INSTANCE_LAYERS"
     else
         export VK_INSTANCE_LAYERS="VK_LAYER_LSFGVK_frame_generation"
     fi
+    export VK_LOADER_LAYERS_ENABLE="VK_LAYER_LSFGVK_frame_generation${VK_LOADER_LAYERS_ENABLE:+,$VK_LOADER_LAYERS_ENABLE}"
 
-    # Native SteamOS Mesa Turnip presentation optimization
-    export MESA_VK_WSI_PRESENT_MODE="mailbox"
+    # SteamOS Gamescope WSI & HDR Workarounds
+    export ENABLE_GAMESCOPE_WSI="${ENABLE_GAMESCOPE_WSI:-0}"
+    export DISABLE_GAMESCOPE_WSI="${DISABLE_GAMESCOPE_WSI:-1}"
+    export DXVK_HDR=0
 
-    echo "[SteamFrame-LSFG] Active for AppID $APP_ID | Multiplier: ${MULTIPLIER}x | Flow: $FLOW_SCALE | PerfMode: $PERF_MODE"
-    echo "Resolved Lossless.dll: $DLL_PATH" >> "$LOG_FILE"
-    echo "Active Profile: $TARGET_CONFIG" >> "$LOG_FILE"
-    echo "Framegen Settings: ${MULTIPLIER}x | Flow: $FLOW_SCALE | PerfMode: $PERF_MODE" >> "$LOG_FILE"
-    echo "Layer Activated: $VK_INSTANCE_LAYERS" >> "$LOG_FILE"
+    # Presentation mode: default to mailbox to prevent double-present FIFO stutter/flickering
+    if [ "$LSFGVK_OVERRIDE_PRESENT_MODE" = "1" ]; then
+        export MESA_VK_WSI_PRESENT_MODE="${MESA_VK_WSI_PRESENT_MODE:-fifo}"
+    else
+        export MESA_VK_WSI_PRESENT_MODE="${MESA_VK_WSI_PRESENT_MODE:-mailbox}"
+    fi
+
+    echo "[SteamFrame-LSFG] Active for AppID $APP_ID | Multiplier: ${LSFGVK_MULTIPLIER}x | Flow: $LSFGVK_FLOW_SCALE | PerfMode: $LSFGVK_PERFORMANCE_MODE | OverridePresent: $LSFGVK_OVERRIDE_PRESENT_MODE"
 else
     export ENABLE_LSFG=0
     echo "[SteamFrame-LSFG] Disabled for AppID $APP_ID"
 fi
 
 # 4. Hand off execution to game
-exec "$@"
+if [ "${LSFG_DEBUG:-0}" = "1" ]; then
+    exec "$@" >> "$LOG_FILE" 2>&1
+else
+    exec "$@"
+fi
+

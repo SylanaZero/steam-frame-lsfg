@@ -80,8 +80,11 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo "[5/6] Searching for licensed Lossless.dll in Steam libraries..."
 SEARCH_PATHS=(
     "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/Lossless.dll"
+    "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/lsfg-vk.dll"
     "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
+    "$HOME/.steam/steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"
     "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
+    "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"
     "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "/run/media/*/steamapps/common/Lossless Scaling/Lossless.dll"
     "/run/media/*/*/steamapps/common/Lossless Scaling/Lossless.dll"
@@ -92,7 +95,10 @@ SEARCH_PATHS=(
 for vdf in "$HOME/.local/share/Steam/steamapps/libraryfolders.vdf" "$HOME/.steam/steam/steamapps/libraryfolders.vdf"; do
     if [ -f "$vdf" ]; then
         while read -r libpath; do
-            [ -n "$libpath" ] && SEARCH_PATHS+=("$libpath/steamapps/common/Lossless Scaling/Lossless.dll")
+            if [ -n "$libpath" ]; then
+                SEARCH_PATHS+=("$libpath/steamapps/common/Lossless Scaling/Lossless.dll")
+                SEARCH_PATHS+=("$libpath/steamapps/common/Lossless Scaling/lsfg-vk.dll")
+            fi
         done < <(grep '"path"' "$vdf" 2>/dev/null | cut -d '"' -f 4 || true)
     fi
 done
@@ -118,16 +124,21 @@ done
 
 # Fallback deep search across Steam directories if still not found
 if [ -z "$FOUND_DLL" ]; then
-    FOUND_DLL=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" 2>/dev/null | head -n1 || true)
+    FOUND_DLL=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "Lossless.dll" -o -iname "lsfg-vk.dll" 2>/dev/null | head -n1 || true)
     if [ -n "$FOUND_DLL" ]; then
         FOUND_SOURCE="Deep Filesystem Search"
     fi
 fi
 
 # Fallback: check bundled DLL in package root directory last
-if [ -z "$FOUND_DLL" ] && [ -f "$ROOT_DIR/Lossless.dll" ]; then
-    FOUND_DLL="$ROOT_DIR/Lossless.dll"
-    FOUND_SOURCE="Package Root Fallback ($ROOT_DIR)"
+if [ -z "$FOUND_DLL" ]; then
+    if [ -f "$ROOT_DIR/Lossless.dll" ]; then
+        FOUND_DLL="$ROOT_DIR/Lossless.dll"
+        FOUND_SOURCE="Package Root Fallback ($ROOT_DIR)"
+    elif [ -f "$ROOT_DIR/lsfg-vk.dll" ]; then
+        FOUND_DLL="$ROOT_DIR/lsfg-vk.dll"
+        FOUND_SOURCE="Package Root Fallback ($ROOT_DIR)"
+    fi
 fi
 
 if [ -n "$FOUND_DLL" ]; then

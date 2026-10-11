@@ -73,7 +73,7 @@ The user posed three architectural avenues:
 +-----------------------------------------------------------------------------------+
 |                        VULKAN FRAME GENERATION LAYER                              |
 |                                                                                   |
-|   VK_LAYER_LS_frame_generation (Native ARM64 `libVkLayer_lsfg.so`)                |
+|   VK_LAYER_LSFGVK_frame_generation (Native ARM64 `liblsfg-vk-layer.so`)           |
 |   - Hooks vkQueuePresentKHR & vkCreateSwapchainKHR                                |
 |   - Loads frame-generation model from licensed Lossless.dll                       |
 |   - Executes optical flow & intermediate frame synthesis                          |

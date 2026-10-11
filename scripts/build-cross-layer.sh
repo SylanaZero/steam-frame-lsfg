@@ -21,15 +21,23 @@ else
     echo "[1/4] Upstream source found at $SUBMODULE_DIR"
 fi
 
-# 2. Check for cross compiler
-if ! command -v aarch64-linux-gnu-g++ &>/dev/null; then
-    echo "ERROR: 'aarch64-linux-gnu-g++' cross compiler not found on this host."
-    echo ""
-    echo "To build inside a clean container on an x86_64 host, run:"
-    echo "  docker build -f Dockerfile.cross -t steam-frame-lsfg-builder ."
-    echo "  docker run --rm -v \"$ROOT_DIR\":/workspace steam-frame-lsfg-builder"
-    echo ""
-    exit 1
+# 2. Check for cross compiler or native ARM64 environment
+HOST_ARCH="$(uname -m 2>/dev/null || echo "unknown")"
+CMAKE_EXTRA_ARGS=()
+
+if [ "$HOST_ARCH" = "aarch64" ] || [ "$HOST_ARCH" = "arm64" ]; then
+    echo "[2/4] Native ARM64 ($HOST_ARCH) environment detected."
+else
+    if ! command -v aarch64-linux-gnu-g++ &>/dev/null; then
+        echo "ERROR: 'aarch64-linux-gnu-g++' cross compiler not found on this host ($HOST_ARCH)."
+        echo ""
+        echo "To build inside a clean container on an x86_64 host, run:"
+        echo "  docker build -f Dockerfile.cross -t steam-frame-lsfg-builder ."
+        echo "  docker run --rm -v \"$ROOT_DIR\":/workspace steam-frame-lsfg-builder"
+        echo ""
+        exit 1
+    fi
+    CMAKE_EXTRA_ARGS+=("-DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_FILE")
 fi
 
 # 3. Configure CMake with Snapdragon 8 Gen 3 cross profile
@@ -37,7 +45,7 @@ BUILD_DIR="$SUBMODULE_DIR/build-arm64"
 echo "[2/4] Configuring CMake with Snapdragon 8 Gen 3 cross toolchain..."
 cmake -B "$BUILD_DIR" -S "$SUBMODULE_DIR" \
     -G Ninja \
-    -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+    "${CMAKE_EXTRA_ARGS[@]}" \
     -DCMAKE_BUILD_TYPE=Release \
     -DLSFGVK_BUILD_LAYER=ON \
     -DLSFGVK_BUILD_CLI=ON \
@@ -58,8 +66,6 @@ if [ -z "$OUTPUT_SO" ] || [ ! -f "$OUTPUT_SO" ]; then
 fi
 
 cp "$OUTPUT_SO" "$LAYER_DIR/liblsfg-vk-layer.so"
-# Also symlink or copy to libVkLayer_lsfg.so for alias compatibility
-cp "$OUTPUT_SO" "$LAYER_DIR/libVkLayer_lsfg.so"
 
 OUTPUT_JSON=$(find "$BUILD_DIR" -name "VkLayer_LSFGVK_frame_generation.json" | head -n1)
 if [ -n "$OUTPUT_JSON" ] && [ -f "$OUTPUT_JSON" ]; then

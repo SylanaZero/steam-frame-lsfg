@@ -14,7 +14,7 @@ set(CMAKE_RANLIB aarch64-linux-gnu-ranlib)
 # Hardware-tuned compiler flags for Snapdragon 8 Gen 3 (ARMv9.2-A / FP16 compute)
 set(CMAKE_C_FLAGS_INIT "-O3 -march=armv8.2-a+fp16 -mtune=cortex-a720 -fPIC")
 set(CMAKE_CXX_FLAGS_INIT "-O3 -march=armv8.2-a+fp16 -mtune=cortex-a720 -fPIC")
-
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "-static-libstdc++ -static-libgcc")
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
