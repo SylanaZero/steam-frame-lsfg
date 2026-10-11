@@ -31,3 +31,8 @@ To enable verbose logging if troubleshooting a specific title:
 ```text
 LSFG_DEBUG=1 ~/lsfg %command%
 ```
+
+---
+
+## ⚠️ Disclaimer
+This is an independent open-source community project. It is not affiliated with, sponsored by, or endorsed by Valve Corporation, Qualcomm, or THS. Valve, Steam, and Steam Frame are trademarks or registered trademarks of Valve Corporation.

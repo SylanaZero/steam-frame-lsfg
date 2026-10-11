@@ -161,3 +161,9 @@ Parameters:
 This project's tooling, scripts, configuration, and documentation are licensed under the [MIT License](LICENSE).
 * **Lossless Scaling**: Proprietary software developed by THS (available on Steam, App ID `993090`).
 * **`lsfg-vk`**: The upstream Vulkan compatibility layer submodule is licensed under CC BY-NC-ND 4.0 by PancakeTAS.
+
+---
+
+## ⚠️ Disclaimer
+
+This is an independent open-source community project. It is not affiliated with, sponsored by, or endorsed by Valve Corporation, Qualcomm, or THS. Valve, Steam, and Steam Frame are trademarks or registered trademarks of Valve Corporation. All other trademarks are property of their respective owners.
