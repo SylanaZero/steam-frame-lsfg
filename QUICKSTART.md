@@ -6,7 +6,7 @@ Lossless Scaling Frame Generation (LSFG) for the **Valve Steam Frame** (Snapdrag
 
 ## 📋 Prerequisites
 1. **Lossless Scaling**: Purchased on Steam (App ID `993090`).
-2. **lsfg-vk**: Official Vulkan layer from [lsfg-vk.dev](https://lsfg-vk.dev).
+2. **Patched ARM64 Vulkan Layer**: Custom-built `liblsfg-vk-layer.so` (see [Upstream Patching Guide in README.md](README.md#-what-needs-to-be-patched-in-upstream-lsfg-vk)).
 3. **Valve Steam Frame**: Running SteamOS ARM64.
 
 ---
@@ -16,9 +16,16 @@ Lossless Scaling Frame Generation (LSFG) for the **Valve Steam Frame** (Snapdrag
 ```bash
 git clone https://github.com/SylanaZero/steam-frame-lsfg.git
 cd steam-frame-lsfg
+```
+2. Place your compiled `liblsfg-vk-layer.so` into the `layer/` directory (or `~/.local/share/steam-frame-lsfg/lib/`):
+```bash
+cp /path/to/your/liblsfg-vk-layer.so layer/liblsfg-vk-layer.so
+```
+3. Run the installer:
+```bash
 bash scripts/install.sh
 ```
-The installer sets up your `~/lsfg` launcher wrapper, anti-flicker presentation settings, and default per-game profiles.
+The installer sets up your `~/lsfg` launcher wrapper, registers the layer, applies anti-flicker presentation settings, and configures default per-game profiles.
 
 
 > [!NOTE]

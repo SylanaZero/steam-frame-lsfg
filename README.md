@@ -4,14 +4,128 @@
 [![GPU Target](https://img.shields.io/badge/GPU-Qualcomm%20Adreno%20750-orange.svg)](#)
 [![Driver](https://img.shields.io/badge/Driver-Mesa%20Turnip%20(Vulkan%201.3)-green.svg)](#)
 [![Platform](https://img.shields.io/badge/OS-SteamOS%20ARM64-purple.svg)](#)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A dedicated, hardware-optimized project providing **Lossless Scaling Frame Generation (LSFG)** support on the **Valve Steam Frame** (Snapdragon 8 Gen 3 SoC, Adreno 750 GPU, running SteamOS ARM64).
+A dedicated, hardware-optimized companion project providing **Lossless Scaling Frame Generation (LSFG)** runtime orchestration, launcher scripts, and configuration on the **Valve Steam Frame** (Snapdragon 8 Gen 3 SoC, Adreno 750 GPU, running SteamOS ARM64).
+
+---
+
+> [!CAUTION]
+> ### ⚠️ CRITICAL PREREQUISITE & LICENSE COMPLIANCE NOTICE
+> **The scripts, installer, and launch wrapper in this repository WILL NOT WORK without a custom-patched, ARM64-compiled `liblsfg-vk-layer.so` binary.**
+>
+> **Why are precompiled binaries and patch files NOT provided here?**
+> * Upstream **`lsfg-vk`** is developed by **PancakeTAS** and licensed under **[Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/)**. This license strictly prohibits distributing modified versions (derivatives), including distributing modified source trees, diffs/patch files, or precompiled derivative binaries.
+> * **`Lossless.dll`** is proprietary commercial software developed by **THS** (available on Steam, App ID `993090`).
+>
+> To maintain strict license compliance:
+> 1. **This repository DOES NOT distribute precompiled `liblsfg-vk-layer.so` binaries.**
+> 2. **This repository DOES NOT host `.patch` or `.diff` files.**
+>
+> Instead, this project provides the independent launch wrapper, environment orchestration, SteamOS configs, and the **[Upstream Patching Guide](#-what-needs-to-be-patched-in-upstream-lsfg-vk)** below explaining what needs to be modified in upstream source so you can build your own working layer.
+
+---
+
+## 🛠️ What Needs to Be Patched in Upstream `lsfg-vk`
+
+To get `lsfg-vk` working on the Steam Frame with modern releases of Lossless Scaling, an unpatched upstream build from [PancakeTAS/lsfg-vk](https://git.lsfg-vk.dev/lsfg-vk.git) will fail due to changes in modern DLL packaging and ARM64 C++ runtime dependencies. 
+
+If you are compiling your own layer, the following specific areas need to be modified:
+
+### 1. Multi-API SPIR-V Resource ID Shift (+300 Offset)
+* **The Problem:** Stock `lsfg-vk` was written for legacy versions of `Lossless.dll` where Vulkan SPIR-V shaders began at Resource ID 1. Modern `Lossless.dll` (v3.x / multi-API) packages shaders for multiple graphics backends into a single binary:
+  * Resource IDs 101–200: Direct3D 11 bytecode
+  * Resource IDs 201–300: Direct3D 12 DXIL shaders
+  * **Resource IDs 301–400: Vulkan SPIR-V shaders** (shifted by `+300`)
+  If unpatched, the layer attempts to parse Direct3D shaders as SPIR-V or looks for non-existent IDs, immediately crashing the game with:
+  ```text
+  (lsfg-vk) [ERROR]: - Unable to find base shader 'mipmaps' in DLL
+  ```
+* **The Fix (`lsfg-vk-pipeline/src/library.cpp`):**
+  Implement dynamic resource offset auto-detection before querying shader resources:
+  ```cpp
+  // Auto-detect resource offset in the DLL (300 for DX11+DX12+Vulkan multi-API DLLs like Lossless.dll 3.x)
+  uint32_t shaderOffset = 0;
+  if (resources.find(303) != resources.end()) {
+      shaderOffset = 300;
+  } else if (resources.find(3) != resources.end()) {
+      shaderOffset = 0;
+  } else if (resources.find(103) != resources.end()) {
+      shaderOffset = 100;
+  } else {
+      for (uint32_t base : { 300U, 0U, 100U, 200U }) {
+          if (resources.find(base + 3) != resources.end()) {
+              shaderOffset = base;
+              break;
+          }
+      }
+  }
+  ```
+  All subsequent shader resource IDs must account for `shaderOffset`:
+  * Base shaders: `const uint32_t rid{shaderOffset + idx};`
+  * Quality/Performance shaders:
+    ```cpp
+    const std::pair<uint32_t, uint32_t> rid{
+        shaderOffset + idx + (halfPrecision ? 48 : 0),
+        shaderOffset + idx + (halfPrecision ? 48 : 0) + 24
+    };
+    ```
+
+### 2. Embedded HDR Mipmaps Handling
+* **The Problem:** Upstream hardcoded a legacy resource ID (`2147488584U`) for the `mipmaps` shader. In v3.x DLLs, this resource is absent.
+* **The Fix (`lsfg-vk-pipeline/src/library.cpp`):**
+  Intercept the `mipmaps` base shader loading and wire it directly to the embedded HDR shader array (`Mipmaps.h`):
+  ```cpp
+  if (name == "mipmaps") {
+      std::vector<uint32_t> shaderData(Mipmaps_len / 4);
+      std::copy_n(
+          reinterpret_cast<const uint32_t*>(Mipmaps),
+          Mipmaps_len / 4,
+          shaderData.data()
+      );
+      this->m_baseShaders["mipmaps"] = vkhelper::createShaderModule(dld, device, shaderData);
+      continue;
+  }
+  ```
+
+### 3. Fallback Probing for the `generate` Shader
+* **The Problem:** The `generate` compute shader ID varies between minor revisions of the DLL.
+* **The Fix (`lsfg-vk-pipeline/src/library.cpp`):**
+  Add fallback resolution when locating the `generate` bytecode:
+  ```cpp
+  if (name == "generate") {
+      auto it = resources.find(shaderOffset + 99);
+      if (it == resources.end()) it = resources.find(shaderOffset + 1);
+      if (it == resources.end()) it = resources.find(1);
+      if (it == resources.end()) it = resources.find(99);
+      if (it == resources.end()) {
+          throw std::runtime_error("Unable to find base shader 'generate' in DLL");
+      }
+      // Proceed with bytecode patching...
+  ```
+
+### 4. Linker Configuration for SteamOS ARM64
+* **The Problem:** When cross-compiling with GCC for ARM64, dynamic `libstdc++.so` or `libgcc_s.so` links can fail at runtime due to `GLIBCXX` symbol mismatches against SteamOS's system libraries.
+* **The Fix (`lsfg-vk-layer/CMakeLists.txt`):**
+  Statically link the standard C++ runtime into the layer:
+  ```cmake
+  target_link_options(lsfg-vk-layer PRIVATE
+    "-static-libstdc++"
+    "-static-libgcc"
+    "LINKER:--exclude-libs,ALL")
+  ```
+
+### 5. Compiling for Snapdragon 8 Gen 3 (Adreno 750)
+When compiling the Vulkan layer for ARM64:
+* Target architecture: `aarch64-linux-gnu`
+* Tuning flags: `-O3 -march=armv8.2-a+fp16 -mtune=cortex-a720 -fPIC`
+* For complete step-by-step toolchain and CMake setup details, refer to [`docs/REPLICATION_GUIDE.md`](docs/REPLICATION_GUIDE.md).
 
 ---
 
 ## 📁 Package Contents & File Reference
 
-This repository contains runtime scripts, hardware configurations, and diagnostic tools for running frame generation on Steam Frame:
+This repository contains the runtime launcher, system scripts, hardware configurations, and diagnostic tools:
 
 ```text
 steam-frame-lsfg/
@@ -29,7 +143,7 @@ steam-frame-lsfg/
 │   └── src/index.tsx                 # React UI for SteamOS Gamepad QAM
 ├── docs/
 │   ├── ARCHITECTURE.md               # Technical hardware deep-dive for developers
-│   └── REPLICATION_GUIDE.md          # Step-by-step developer replication guide
+│   └── REPLICATION_GUIDE.md          # In-depth technical developer replication guide
 ├── layer/
 │   └── VkLayer_LSFGVK_frame_generation.json # Vulkan 1.3 layer manifest template
 └── scripts/
@@ -45,48 +159,52 @@ steam-frame-lsfg/
 
 | File / Component | Category | Purpose & Description |
 | :--- | :--- | :--- |
-| **`scripts/install.sh`** | **Core Installer** | **Primary installation script.** Configures Vulkan loader manifests, sets up default configuration profiles, and installs the `~/lsfg` launcher wrapper. |
-| **`scripts/lsfg-frame`** | **Core Runtime** | **Launch wrapper.** Installed to `~/lsfg` and `/usr/local/bin/lsfg-frame`. Handles `Lossless.dll` auto-discovery, per-game TOML profile resolution, and flicker-free presentation pacing. |
+| **`scripts/install.sh`** | **Core Installer** | **Primary installation script.** Configures Vulkan loader manifests, sets up default configuration profiles, registers your compiled `liblsfg-vk-layer.so`, and installs `~/lsfg`. |
+| **`scripts/lsfg-frame`** | **Core Runtime** | **Launch wrapper.** Installed to `~/lsfg` and `~/.local/bin/lsfg-frame`. Handles `Lossless.dll` auto-discovery, per-game TOML profile resolution, and flicker-free presentation pacing. |
 | **`layer/VkLayer_LSFGVK_frame_generation.json`** | **Core Runtime** | **Vulkan layer manifest template.** Registered with SteamOS's Vulkan loader (`implicit_layer.d` and `explicit_layer.d`) for layer discovery. |
-| **`scripts/verify-env.sh`** | **Diagnostics** | **Environment verifier.** Checks CPU architecture, Qualcomm Snapdragon 8 Gen 3 core clusters, Mesa Turnip driver status, FEX-Emu, and Steam libraries. (Run automatically by `install.sh`). |
-| **`scripts/smoke-test-layer.sh`** | **Diagnostics** | **Diagnostic test.** Checks manifest syntax and tests Vulkan loader discovery via `vulkaninfo` without launching a game. |
+| **`scripts/verify-env.sh`** | **Diagnostics** | **Environment verifier.** Checks CPU architecture, Snapdragon 8 Gen 3 core clusters, Mesa Turnip driver status, FEX-Emu, and Steam libraries. |
+| **`scripts/smoke-test-layer.sh`** | **Diagnostics** | **Diagnostic test.** Verifies layer ELF architecture, manifest validity, and Vulkan loader discovery via `vulkaninfo`. |
 | **`scripts/build-cross-layer.sh`** | **Developer Tool** | **Reference build script.** Demonstrates building the layer from upstream `lsfg-vk` source using `aarch64-linux-gnu-g++`. |
-| **`scripts/install-turnip-aurora.sh`** | **Experimental Tool** | **Alternative driver installer.** Downloads and installs community Balemuni Aurora Turnip driver builds into `~/.local/share/steam-frame-lsfg/drivers/` for testing bleeding-edge driver fixes. |
-| **`config/config.default.toml`** | **Configuration** | **Default configuration template.** Deployed to `~/.config/steam-frame-lsfg/config.toml`. Pre-tuned with `override_present_mode = false` and `mailbox` presentation for smooth, flicker-free delivery. |
-| **`config/profiles/*.toml`** | **Configuration** | **Per-game optimization profiles.** Game-specific presets deployed by the installer (`1091500.toml` for Cyberpunk 2077, `1145360.toml` for Hades II, `default.toml`). |
-| **`decky-plugin/`** | **Optional UI** | **Decky Loader plugin.** Provides an on-screen Quick Access Menu (QAM) slider panel for adjusting multipliers, optical flow scale, and performance mode on the fly. |
-| **`docs/ARCHITECTURE.md`** | **Documentation** | **Hardware architecture guide.** Comprehensive technical documentation on Snapdragon 8 Gen 3, Adreno 750 GMEM tile memory, memory bandwidth constraints, and Gamescope WSI. |
-| **`docs/REPLICATION_GUIDE.md`** | **Documentation** | **Developer guide.** Step-by-step documentation on hardware-specific architecture and presentation pacing. |
-| **`QUICKSTART.md`** | **Documentation** | **Quickstart guide.** Step-by-step instructions for installing and configuring Steam launch options. |
+| **`scripts/install-turnip-aurora.sh`** | **Experimental Tool** | **Alternative driver installer.** Downloads and installs community Balemuni Aurora Turnip driver builds for testing bleeding-edge driver fixes. |
+| **`config/config.default.toml`** | **Configuration** | **Default configuration template.** Deployed to `~/.config/steam-frame-lsfg/config.toml`. Pre-tuned with `override_present_mode = false` and `mailbox` presentation. |
+| **`config/profiles/*.toml`** | **Configuration** | **Per-game optimization profiles.** Presets deployed by the installer (`1091500.toml` for Cyberpunk 2077, `1145360.toml` for Hades II, `default.toml`). |
+| **`decky-plugin/`** | **Optional UI** | **Decky Loader plugin.** Experimental Quick Access Menu (QAM) slider panel for adjusting multipliers and optical flow scale on the fly. |
+| **`docs/ARCHITECTURE.md`** | **Documentation** | **Hardware architecture guide.** Comprehensive technical documentation on Snapdragon 8 Gen 3, Adreno 750 GMEM tile memory, and Gamescope WSI. |
+| **`docs/REPLICATION_GUIDE.md`** | **Documentation** | **Developer guide.** Full technical walkthrough of building, patching, and tuning the layer. |
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Quickstart & Setup Guide
 
 ### Step 1: Prerequisites
-1. **Lossless Scaling Ownership**: Purchase and download [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) on Steam.
-2. **lsfg-vk**: Official Vulkan layer from [lsfg-vk.dev](https://lsfg-vk.dev).
+1. **Lossless Scaling Ownership**: Purchase and download [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) on Steam (App ID `993090`).
+2. **Patched ARM64 Vulkan Layer**: Build your own ARM64 `liblsfg-vk-layer.so` using the [Upstream Patching Guide](#-what-needs-to-be-patched-in-upstream-lsfg-vk).
 3. **Valve Steam Frame**: Running SteamOS ARM64 with native Mesa Turnip Vulkan driver.
 
-### Step 2: Installation
-Clone or download this repository on your Steam Frame and run:
-
-```bash
-git clone https://github.com/SylanaZero/steam-frame-lsfg.git
-cd steam-frame-lsfg
-bash scripts/install.sh
-```
+### Step 2: Place the Compiled Layer & Run Installer
+1. Clone this repository on your Steam Frame:
+   ```bash
+   git clone https://github.com/SylanaZero/steam-frame-lsfg.git
+   cd steam-frame-lsfg
+   ```
+2. Copy your compiled, patched ARM64 `liblsfg-vk-layer.so` into the `layer/` directory (or `~/.local/share/steam-frame-lsfg/lib/`):
+   ```bash
+   cp /path/to/your/liblsfg-vk-layer.so layer/liblsfg-vk-layer.so
+   ```
+3. Run the installer:
+   ```bash
+   bash scripts/install.sh
+   ```
 
 The installer will:
-1. Verify the ARM64 environment and Mesa Turnip Vulkan driver.
-2. Locate `Lossless.dll` in your Steam library directories.
-3. Configure the Vulkan layer manifests and default presentation profiles.
-
-4. Install the launch wrapper to `~/lsfg` and `~/.local/bin/lsfg-frame`.
-5. Deploy the Decky Loader plugin if Decky is installed.
+* Verify the ARM64 environment and Mesa Turnip Vulkan driver.
+* Auto-discover `Lossless.dll` from your Steam library.
+* Install and link `liblsfg-vk-layer.so` into system Vulkan directories.
+* Generate valid Vulkan 1.3 explicit and implicit layer manifests.
+* Install the launch wrapper to `~/lsfg` and `~/.local/bin/lsfg-frame`.
+* Deploy the Decky Loader plugin if Decky Loader is present.
 
 ### Step 3: Enabling in Games
-
 In the Steam client:
 1. Right-click your game $\to$ **Properties**.
 2. Under **Launch Options**, enter:
@@ -96,7 +214,7 @@ In the Steam client:
    *(or `/home/steamos/lsfg %command%`)*
 3. Launch the game!
 
-#### For Non-Steam Games & Custom Drivers (e.g., Battle.net / WoW Forever):
+#### For Non-Steam Games & Custom Drivers:
 Keep environment variables (like `VK_ICD_FILENAMES=...`) before `~/lsfg`:
 ```text
 VK_ICD_FILENAMES=/path/to/custom_icd.json ~/lsfg %command%
@@ -106,7 +224,7 @@ VK_ICD_FILENAMES=/path/to/custom_icd.json ~/lsfg %command%
 
 ## ⚙️ Recommended In-Game Settings (Flicker-Free & Smooth)
 
-To avoid compositor collisions and frame pacing judder:
+To avoid compositor collisions and frame pacing judder in Gamescope:
 * **In-Game V-Sync**: **OFF** (the LSFG layer uses smooth Mailbox presentation).
 * **Display Mode**: **Borderless Windowed** (or Windowed Fullscreen).
 * **Motion Blur**: **OFF** (prevents optical flow motion blur noise).
@@ -131,6 +249,11 @@ By default, disk logging is **disabled** to avoid generating large log files on 
 * **Verify System Health**:
   ```bash
   bash scripts/verify-env.sh
+  ```
+
+* **Test Layer Registration**:
+  ```bash
+  bash scripts/smoke-test-layer.sh
   ```
 
 * **FP32 Quality Shader Mode**:
@@ -162,10 +285,9 @@ This project's original tooling, scripts, configuration profiles, and documentat
 * **`lsfg-vk`**: Upstream Vulkan compatibility layer developed by [PancakeTAS](https://lsfg-vk.dev), licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/).
 
 ### ⚠️ Upstream Compliance Notice
-* **Independent Companion:** This repository is an independent companion configuration and launch wrapper for the Valve Steam Frame. It does not distribute, fork, or modify `lsfg-vk` binaries or source code.
-* **Official Layer:** Users should obtain official, unmodified releases of `lsfg-vk` directly from [lsfg-vk.dev](https://lsfg-vk.dev).
+* **Independent Companion:** This repository is an independent companion configuration and launch wrapper for the Valve Steam Frame. It does not distribute, fork, or host `lsfg-vk` binaries or patch files.
+* **Official Layer:** Users must obtain official source code from [lsfg-vk.dev](https://lsfg-vk.dev) / [git.lsfg-vk.dev](https://git.lsfg-vk.dev/lsfg-vk.git).
 * **No Derivative Distribution:** In accordance with the CC BY-NC-ND 4.0 license, this repository hosts no precompiled layer binaries and no patch files.
-
 
 ---
 
@@ -197,7 +319,7 @@ I've never published anything open source before, so please be gentle with feedb
 
 Here's the prompt I used to kick off this project:
 
-```
+```text
 Let's create a new project.
 
 I'd like to see about adding Lossless Scaling Frame Generation (LSFG) support to the Valve "Steam Frame".  It's currently supported on the Steam Deck, but I can't find any projects that enable it on the Steam Frame, which is running on an ARM64 processor (Snapdragon 8, Gen 3 with an Adreno 750 GPU).  
@@ -230,7 +352,7 @@ What would be the best way to go about adding lsfg-vk support to the Steam Frame
 
 Antigravity responded:
 
-```
+```text
 Analysis of Your Three Options
 
 Option 1: Updating Decky Loader to be compatible, then loading lsfg-vk
@@ -240,6 +362,7 @@ Why: Decky Loader is strictly a frontend UI plugin manager injecting into Steam�
 Option 2: Creating a standalone plugin / wrapper that runs per app
 Verdict: Essential for rock-solid reliability.
 Why: Wrapping game execution via launch options (~/lsfg %command%) or hooking into Proton directly bypasses the Steam UI layer entirely. It communicates directly with Vulkan and FEX-Emu/Proton via environment variables (ENABLE_LSFG=1, VK_INSTANCE_LAYERS=VK_LAYER_LS_frame_generation). However, its drawback is that players cannot adjust multipliers or flow scale on the fly without exiting the game.
+
 Option 3: The Recommended Strategy — Hybrid Dual-Tier Architecture
 
 Following the lessons from ArmadaOS (e.g., Janleyx/decky-lsfg-vk-for-Ayn-Odin-2 and BakaPute/ArmadaLSFG) and GameNative/DroidDeck, the gold standard is decoupling the engine from the UI:
