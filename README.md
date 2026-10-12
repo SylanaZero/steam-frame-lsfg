@@ -11,7 +11,7 @@ A dedicated, hardware-optimized project providing **Lossless Scaling Frame Gener
 
 ## 📁 Package Contents & File Reference
 
-This release archive contains everything needed for one-click installation, plus diagnostic and developer tools:
+This repository contains runtime scripts, hardware configurations, and diagnostic tools for running frame generation on Steam Frame:
 
 ```text
 steam-frame-lsfg/
@@ -29,16 +29,15 @@ steam-frame-lsfg/
 │   └── src/index.tsx                 # React UI for SteamOS Gamepad QAM
 ├── docs/
 │   ├── ARCHITECTURE.md               # Technical hardware deep-dive for developers
-│   └── REPLICATION_GUIDE.md          # Step-by-step build & replication guide
+│   └── REPLICATION_GUIDE.md          # Step-by-step developer replication guide
 ├── layer/
-│   ├── liblsfg-vk-layer.so           # Pre-compiled ARM64 Vulkan layer binary
-│   └── VkLayer_LSFGVK_frame_generation.json # Vulkan 1.3 layer manifest
+│   └── VkLayer_LSFGVK_frame_generation.json # Vulkan 1.3 layer manifest template
 └── scripts/
     ├── install.sh                    # [Core] Primary installer script
     ├── lsfg-frame                    # [Core] Production launch wrapper (~/lsfg)
     ├── verify-env.sh                 # [Core] System diagnostic & environment check script
-    ├── smoke-test-layer.sh           # [Diagnostics] 4-point Vulkan layer registration test
-    ├── build-cross-layer.sh          # [Developer] Recompilation script (ARM64 or x86_64 host)
+    ├── smoke-test-layer.sh           # [Diagnostics] Vulkan layer registration test
+    ├── build-cross-layer.sh          # [Developer] Reference build script for ARM64/x86_64 host
     └── install-turnip-aurora.sh      # [Experimental] Alternative Turnip driver installer
 ```
 
@@ -46,20 +45,19 @@ steam-frame-lsfg/
 
 | File / Component | Category | Purpose & Description |
 | :--- | :--- | :--- |
-| **`scripts/install.sh`** | **Core Installer** | **Primary installation script.** Deploys the layer library to `~/.local/share/steam-frame-lsfg/lib/`, writes Vulkan loader manifests, sets up default configuration profiles, and installs the `~/lsfg` launcher wrapper. |
+| **`scripts/install.sh`** | **Core Installer** | **Primary installation script.** Configures Vulkan loader manifests, sets up default configuration profiles, and installs the `~/lsfg` launcher wrapper. |
 | **`scripts/lsfg-frame`** | **Core Runtime** | **Launch wrapper.** Installed to `~/lsfg` and `/usr/local/bin/lsfg-frame`. Handles `Lossless.dll` auto-discovery, per-game TOML profile resolution, and flicker-free presentation pacing. |
-| **`layer/liblsfg-vk-layer.so`** | **Core Binary** | **Compiled ARM64 Vulkan layer.** Stripped 2.4 MB binary compiled with the Lossless Scaling v3.2.2.0 SPIR-V resource offset fix, Adreno 750 compute optimizations, and Vulkan 1.3 swapchain wrapping. |
-| **`layer/VkLayer_LSFGVK_frame_generation.json`** | **Core Runtime** | **Vulkan layer manifest.** Registered with SteamOS's Vulkan loader (`implicit_layer.d` and `explicit_layer.d`) so the layer can intercept swapchain calls. |
+| **`layer/VkLayer_LSFGVK_frame_generation.json`** | **Core Runtime** | **Vulkan layer manifest template.** Registered with SteamOS's Vulkan loader (`implicit_layer.d` and `explicit_layer.d`) for layer discovery. |
 | **`scripts/verify-env.sh`** | **Diagnostics** | **Environment verifier.** Checks CPU architecture, Qualcomm Snapdragon 8 Gen 3 core clusters, Mesa Turnip driver status, FEX-Emu, and Steam libraries. (Run automatically by `install.sh`). |
-| **`scripts/smoke-test-layer.sh`** | **Diagnostics** | **Quick diagnostic test.** Validates the ARM64 ELF header of `liblsfg-vk-layer.so`, checks manifest syntax, and tests Vulkan loader discovery via `vulkaninfo` without launching a game. |
-| **`scripts/build-cross-layer.sh`** | **Developer Tool** | **Recompilation script.** Clones upstream `lsfg-vk` and builds `liblsfg-vk-layer.so` from source. Supports cross-compiling on x86_64 Linux/WSL with `aarch64-linux-gnu-g++` or compiling natively on ARM64. |
+| **`scripts/smoke-test-layer.sh`** | **Diagnostics** | **Diagnostic test.** Checks manifest syntax and tests Vulkan loader discovery via `vulkaninfo` without launching a game. |
+| **`scripts/build-cross-layer.sh`** | **Developer Tool** | **Reference build script.** Demonstrates building the layer from upstream `lsfg-vk` source using `aarch64-linux-gnu-g++`. |
 | **`scripts/install-turnip-aurora.sh`** | **Experimental Tool** | **Alternative driver installer.** Downloads and installs community Balemuni Aurora Turnip driver builds into `~/.local/share/steam-frame-lsfg/drivers/` for testing bleeding-edge driver fixes. |
 | **`config/config.default.toml`** | **Configuration** | **Default configuration template.** Deployed to `~/.config/steam-frame-lsfg/config.toml`. Pre-tuned with `override_present_mode = false` and `mailbox` presentation for smooth, flicker-free delivery. |
 | **`config/profiles/*.toml`** | **Configuration** | **Per-game optimization profiles.** Game-specific presets deployed by the installer (`1091500.toml` for Cyberpunk 2077, `1145360.toml` for Hades II, `default.toml`). |
 | **`decky-plugin/`** | **Optional UI** | **Decky Loader plugin.** Provides an on-screen Quick Access Menu (QAM) slider panel for adjusting multipliers, optical flow scale, and performance mode on the fly. |
 | **`docs/ARCHITECTURE.md`** | **Documentation** | **Hardware architecture guide.** Comprehensive technical documentation on Snapdragon 8 Gen 3, Adreno 750 GMEM tile memory, memory bandwidth constraints, and Gamescope WSI. |
-| **`docs/REPLICATION_GUIDE.md`** | **Documentation** | **Build & replication guide.** Step-by-step developer guide documenting cross-compilation toolchains, shader resource reverse-engineering, and presentation pacing patches. |
-| **`QUICKSTART.md`** | **Documentation** | **Quickstart guide.** Step-by-step instructions for extracting, installing, and configuring Steam launch options. |
+| **`docs/REPLICATION_GUIDE.md`** | **Documentation** | **Developer guide.** Step-by-step documentation on hardware-specific architecture and presentation pacing. |
+| **`QUICKSTART.md`** | **Documentation** | **Quickstart guide.** Step-by-step instructions for installing and configuring Steam launch options. |
 
 ---
 
@@ -67,22 +65,23 @@ steam-frame-lsfg/
 
 ### Step 1: Prerequisites
 1. **Lossless Scaling Ownership**: Purchase and download [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) on Steam.
-   * *Branch Note*: The standard branch provides `Lossless.dll`; the `lsfg-vk` beta branch (Properties $\to$ Betas) provides `lsfg-vk.dll`. The installer automatically searches for either and mirrors both names so either branch works out of the box.
-2. **Valve Steam Frame**: Running SteamOS ARM64 with native Mesa Turnip Vulkan driver.
+2. **lsfg-vk**: Official Vulkan layer from [lsfg-vk.dev](https://lsfg-vk.dev).
+3. **Valve Steam Frame**: Running SteamOS ARM64 with native Mesa Turnip Vulkan driver.
 
 ### Step 2: Installation
-Download or transfer `steam-frame-lsfg-release.zip` to your Steam Frame, extract into a dedicated directory, and run:
+Clone or download this repository on your Steam Frame and run:
 
 ```bash
-unzip -o steam-frame-lsfg-release.zip -d steam-frame-lsfg
+git clone https://github.com/SylanaZero/steam-frame-lsfg.git
 cd steam-frame-lsfg
 bash scripts/install.sh
 ```
 
 The installer will:
 1. Verify the ARM64 environment and Mesa Turnip Vulkan driver.
-2. Locate `Lossless.dll` / `lsfg-vk.dll` in your Steam library directories and mirror both into place.
-3. Deploy the pre-compiled Vulkan layer to `~/.local/share/vulkan/implicit_layer.d/` and explicit layer directories.
+2. Locate `Lossless.dll` in your Steam library directories.
+3. Configure the Vulkan layer manifests and default presentation profiles.
+
 4. Install the launch wrapper to `~/lsfg` and `~/.local/bin/lsfg-frame`.
 5. Deploy the Decky Loader plugin if Decky is installed.
 
@@ -156,17 +155,17 @@ Parameters:
 
 ---
 
-## 📄 License
+## 📄 License & Upstream Policy
 
-This project's original tooling, scripts, configuration, and documentation are licensed under the [MIT License](LICENSE).
+This project's original tooling, scripts, configuration profiles, and documentation are licensed under the [MIT License](LICENSE).
 * **Lossless Scaling**: Proprietary software developed by THS (available on Steam, App ID `993090`).
-* **`lsfg-vk`**: Upstream Vulkan compatibility layer licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/) by PancakeTAS.
+* **`lsfg-vk`**: Upstream Vulkan compatibility layer developed by [PancakeTAS](https://lsfg-vk.dev), licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/).
 
-### ⚠️ Upstream Binary & Distribution Notice
-* The prebuilt Vulkan layer binary (`liblsfg-vk-layer.so`) included in release archives is built from [PancakeTAS's lsfg-vk](https://git.lsfg-vk.dev/lsfg-vk.git).
-* **Modifications:** Incorporates a multi-API shader resource offset patch for ARM64 and multi-runtime DLL compatibility. The full patch is transparently provided in [`patches/0001-steam-frame-lsfg-pipeline-offset-detection.patch`](patches/0001-steam-frame-lsfg-pipeline-offset-detection.patch).
-* **Non-Commercial / Accessibility Intent:** Provided free of charge strictly as an unmonetized convenience build for handheld community testing and accessibility (avoiding the need for users to set up an aarch64 cross-compilation toolchain on SteamOS).
-* **Removal Policy:** If the upstream author ([PancakeTAS](https://git.lsfg-vk.dev/lsfg-vk.git)) prefers that precompiled patched binaries not be distributed directly, please open an issue or reach out, and the prebuilt binaries will be immediately replaced with automated source-build scripts.
+### ⚠️ Upstream Compliance Notice
+* **Independent Companion:** This repository is an independent companion configuration and launch wrapper for the Valve Steam Frame. It does not distribute, fork, or modify `lsfg-vk` binaries or source code.
+* **Official Layer:** Users should obtain official, unmodified releases of `lsfg-vk` directly from [lsfg-vk.dev](https://lsfg-vk.dev).
+* **No Derivative Distribution:** In accordance with the CC BY-NC-ND 4.0 license, this repository hosts no precompiled layer binaries and no patch files.
+
 
 ---
 

@@ -146,7 +146,7 @@ rm -f "$VULKAN_IMPLICIT_DIR/VkLayer_lsfg.json" "$VULKAN_EXPLICIT_DIR/VkLayer_lsf
 rm -f "$LIB_DIR/libVkLayer_lsfg.so"
 
 LAYER_SO=""
-for s in "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$ROOT_DIR/liblsfg-vk-layer.so" "$SCRIPT_DIR/liblsfg-vk-layer.so"; do
+for s in "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$SCRIPT_DIR/layer/liblsfg-vk-layer.so" "$LIB_DIR/liblsfg-vk-layer.so" "$VULKAN_IMPLICIT_DIR/liblsfg-vk-layer.so" "/usr/lib/liblsfg-vk-layer.so" "/usr/local/lib/liblsfg-vk-layer.so"; do
     if [ -f "$s" ]; then
         LAYER_SO="$s"
         break
@@ -154,13 +154,16 @@ for s in "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$ROOT_DIR/liblsfg-vk-layer.so" "
 done
 
 if [ -n "$LAYER_SO" ]; then
-    cp "$LAYER_SO" "$LIB_DIR/liblsfg-vk-layer.so"
-    cp "$LAYER_SO" "$VULKAN_IMPLICIT_DIR/liblsfg-vk-layer.so"
-    cp "$LAYER_SO" "$VULKAN_EXPLICIT_DIR/liblsfg-vk-layer.so"
+    safe_copy_file "$LAYER_SO" "$LIB_DIR/liblsfg-vk-layer.so"
+    safe_copy_file "$LAYER_SO" "$VULKAN_IMPLICIT_DIR/liblsfg-vk-layer.so"
+    safe_copy_file "$LAYER_SO" "$VULKAN_EXPLICIT_DIR/liblsfg-vk-layer.so"
+    echo "Configured Vulkan layer from: $LAYER_SO"
 else
-    echo "ERROR: liblsfg-vk-layer.so not found!"
-    exit 1
+    echo "Notice: Upstream liblsfg-vk-layer.so not found."
+    echo "Please download or install the official lsfg-vk layer from https://lsfg-vk.dev"
+    echo "and place liblsfg-vk-layer.so in $LIB_DIR/ or layer/liblsfg-vk-layer.so."
 fi
+
 
 # Write canonical Vulkan 1.3 layer manifest with absolute library path to both directories
 for target_dir in "$VULKAN_IMPLICIT_DIR" "$VULKAN_EXPLICIT_DIR"; do

@@ -252,10 +252,11 @@ When packaging a release zip file for Linux/SteamOS:
 
 On the Steam Frame:
 ```bash
-unzip -o steam-frame-lsfg-release.zip -d steam-frame-lsfg
+git clone https://github.com/SylanaZero/steam-frame-lsfg.git
 cd steam-frame-lsfg
 bash scripts/install.sh
 ```
+
 
 In Steam Game Launch Options:
 * Standard games: `~/lsfg %command%`
