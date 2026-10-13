@@ -144,8 +144,7 @@ steam-frame-lsfg/
 │   ├── lsfg-frame                    # [Core] Launch wrapper (~/lsfg)
 │   ├── verify-env.sh                 # [Diagnostics] System verification script (5-point check)
 │   ├── smoke-test-layer.sh           # [Diagnostics] Vulkan layer registration test
-│   ├── package-release.sh            # [Build] Release packager (Linux/SteamOS)
-│   └── package-release.ps1           # [Build] Release packager (Windows)
+│   └── package-release.sh            # [Build] Release packager (Linux/SteamOS)
 └── tests/
     └── test_config.py                # Configuration validation tests
 ```
