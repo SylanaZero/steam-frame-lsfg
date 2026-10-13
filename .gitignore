@@ -11,7 +11,7 @@ submodules/
 patches/
 
 
-# Node / Decky plugin
+# Temporary & cache
 node_modules/
 dist/
 *.pyc

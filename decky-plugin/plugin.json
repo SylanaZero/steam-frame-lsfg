@@ -1,8 +1,0 @@
-{
-  "name": "Steam Frame LSFG",
-  "author": "SteamFrameCommunity",
-  "flags": [],
-  "version": "1.0.0",
-  "description": "Lossless Scaling Frame Generation manager for Valve Steam Frame (Snapdragon 8 Gen 3 / ARM64)",
-  "remote_binary": null
-}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Steam Frame LSFG Installation Script
-# Deploys ARM64 Vulkan layer, wrapper script, profiles, and optional Decky plugin
+# Automated build and deployment for Steam Frame LSFG Support
 
 set -e
 
