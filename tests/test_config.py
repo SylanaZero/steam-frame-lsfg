@@ -48,24 +48,9 @@ class TestSteamFrameLSFGConfig(unittest.TestCase):
                 self.assertIn("multiplier", data, f"Profile {p.name} must have 'multiplier'")
                 self.assertIn("flow_scale", data, f"Profile {p.name} must have 'flow_scale'")
 
-    def test_layer_manifest_valid(self):
-        layer_dir = PROJECT_ROOT / "layer"
-        manifest_files = list(layer_dir.glob("*.json"))
-        self.assertGreater(len(manifest_files), 0, "At least one Vulkan layer manifest must exist")
-        
-        import json
-        for mf in manifest_files:
-            with open(mf, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.assertIn("file_format_version", data)
-            self.assertIn("layer", data)
-            self.assertIn("name", data["layer"])
-            self.assertIn("library_path", data["layer"])
-
-    def test_compiled_layer_exists(self):
-        layer_dir = PROJECT_ROOT / "layer"
-        so_files = list(layer_dir.glob("*.so"))
-        self.assertGreater(len(so_files), 0, "At least one compiled .so layer must be present in layer/")
+    def test_installer_script_exists(self):
+        install_sh = PROJECT_ROOT / "install.sh"
+        self.assertTrue(install_sh.exists(), "Root install.sh must exist")
 
 if __name__ == "__main__":
     unittest.main()

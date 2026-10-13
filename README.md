@@ -49,7 +49,7 @@ An automated installer and hardware-optimized companion project providing **Loss
 ```bash
 git clone https://github.com/SylanaZero/steam-frame-lsfg.git
 cd steam-frame-lsfg
-bash scripts/install.sh
+bash install.sh
 ```
 
 ---
@@ -61,7 +61,7 @@ The installer automates the complete setup pipeline in a single pass:
 1. **Environment Verification:** Validates your ARM64 CPU architecture (`aarch64`), Qualcomm Snapdragon 8 Gen 3 SoC, Mesa Turnip Vulkan driver, and FEX-Emu translation environment.
 2. **In-Place Shader Discovery:** Locates and verifies the official 2.1 MB Linux `lsfg-vk.dll` inside your Steam library (`~/.local/share/Steam/steamapps/common/Lossless Scaling/`).
 3. **Native ARM64 `lsfg-vk` Compilation:** Clones stock upstream [`PancakeTAS/lsfg-vk`](https://git.lsfg-vk.dev/lsfg-vk.git) and compiles `liblsfg-vk-layer.so` on-device with GCC 15 and Ninja using Snapdragon 8 Gen 3 optimization flags and static C++ runtime linking.
-4. **Vulkan Layer Manifest Registration:** Installs `liblsfg-vk-layer.so` to `~/.local/share/steam-frame-lsfg/lib/` and registers the layer JSON manifest in both implicit and explicit directories (`~/.local/share/vulkan/implicit_layer.d/` and `~/.local/share/vulkan/explicit_layer.d/`).
+4. **Vulkan Layer Manifest Registration:** Installs `liblsfg-vk-layer.so` to `~/.local/share/steam-frame-lsfg/lib/` and dynamically registers the layer JSON manifest in both implicit and explicit directories (`~/.local/share/vulkan/implicit_layer.d/` and `~/.local/share/vulkan/explicit_layer.d/`).
 5. **FrameGen Configuration & Game Profiles:** Installs tuned configuration (`~/.config/steam-frame-lsfg/config.toml`) with anti-flicker presentation (`override_present_mode = false`) and per-game presets.
 6. **Launch Wrapper Setup:** Installs `~/.local/bin/lsfg-frame` and creates the convenient shortcut `~/lsfg`.
 7. **Automated Smoke Test:** Runs a 4-point verification check to confirm the system Vulkan loader successfully discovers the newly installed layer.
@@ -78,6 +78,13 @@ Once installed, enable frame generation on any game in Steam:
    ~/lsfg %command%
    ```
 3. Launch the game!
+
+### Non-Steam Games & Custom Drivers (e.g., Battle.net / WoW)
+
+If your game runner uses custom driver environment variables (such as `VK_ICD_FILENAMES=...`), place them before the `~/lsfg` wrapper:
+```text
+VK_ICD_FILENAMES=/path/to/icd.json ~/lsfg %command%
+```
 
 ### Recommended In-Game Settings (Smooth & Flicker-Free)
 
@@ -125,7 +132,7 @@ Configuration files are located in `~/.config/steam-frame-lsfg/`:
 
 ```text
 steam-frame-lsfg/
-├── QUICKSTART.md                     # Condensed quickstart guide
+├── install.sh                        # [Core] Automated on-device build & installer script
 ├── README.md                         # Project documentation
 ├── config/
 │   ├── config.default.toml           # Global configuration template
@@ -133,14 +140,14 @@ steam-frame-lsfg/
 │       ├── default.toml              # Fallback profile for all Proton/Windows titles
 │       ├── 1091500.toml              # Profile: Cyberpunk 2077
 │       └── 1145360.toml              # Profile: Hades II
-├── layer/
-│   └── VkLayer_LSFGVK_frame_generation.json # Vulkan layer manifest template
 ├── scripts/
-│   ├── install.sh                    # [Core] Automated on-device build & installer script
 │   ├── lsfg-frame                    # [Core] Launch wrapper (~/lsfg)
 │   ├── verify-env.sh                 # [Diagnostics] System verification script (5-point check)
-│   └── smoke-test-layer.sh           # [Diagnostics] Vulkan layer registration test
-└── steam-frame-lsfg-installer.zip    # Standalone release archive for Steam Frame users
+│   ├── smoke-test-layer.sh           # [Diagnostics] Vulkan layer registration test
+│   ├── package-release.sh            # [Build] Release packager (Linux/SteamOS)
+│   └── package-release.ps1           # [Build] Release packager (Windows)
+└── tests/
+    └── test_config.py                # Configuration validation tests
 ```
 
 ---
