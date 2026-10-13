@@ -5,25 +5,31 @@ Lossless Scaling Frame Generation (LSFG) for the **Valve Steam Frame** (Snapdrag
 ---
 
 ## 📋 Prerequisites
+
 1. **Lossless Scaling (`lsfg-vk.dll`)**: Purchased on Steam (App ID `993090`). Right-click **Lossless Scaling** in Steam $\to$ **Properties** $\to$ **Betas** $\to$ select **`lsfg-vk`** branch.
-2. **ARM64 Vulkan Layer**: Built `liblsfg-vk-layer.so` targeting `aarch64` (see [Build Guide in README.md](README.md#-building-liblsfg-vk-layer-so-for-steam-frame-arm64)).
-3. **Valve Steam Frame**: Running SteamOS ARM64.
+2. **Valve Steam Frame**: Running SteamOS ARM64.
 
 ---
 
 ## 🚀 Step 1: Install
-1. Clone or download this repository onto your Steam Frame:
+
+### Option A: Using the Installer Release Archive (Recommended)
+1. Download [`steam-frame-lsfg-installer.zip`](steam-frame-lsfg-installer.zip) onto your Steam Frame.
+2. In Desktop Mode, extract and run:
+```bash
+unzip steam-frame-lsfg-installer.zip -d steam-frame-lsfg-installer
+cd steam-frame-lsfg-installer
+bash install.sh
+```
+
+### Option B: From Git Repository
 ```bash
 git clone https://github.com/SylanaZero/steam-frame-lsfg.git
 cd steam-frame-lsfg
-```
-2. Run the installer:
-```bash
 bash scripts/install.sh
 ```
-*If `liblsfg-vk-layer.so` is not already compiled, `install.sh` will automatically clone upstream `lsfg-vk` and compile it natively for the Snapdragon 8 Gen 3!*
-*(Optional: If you cross-compiled on an x86 PC, you can drop your precompiled `liblsfg-vk-layer.so` into `layer/` before running the installer to skip compilation).*
-The installer sets up your `~/lsfg` launcher wrapper, auto-discovers `lsfg-vk.dll`, registers the Vulkan layer, applies anti-flicker presentation settings, and configures default per-game profiles.
+
+*The installer automatically validates your system, auto-discovers `lsfg-vk.dll`, clones and compiles `liblsfg-vk-layer.so` for ARM64 on-device, registers Vulkan layer manifests, deploys tuned anti-flicker configs, and sets up your `~/lsfg` launcher wrapper.*
 
 ---
 
@@ -70,6 +76,10 @@ By default, disk logging is **disabled** to avoid filling storage during long pl
 * **Verify System Health**:
   ```bash
   bash scripts/verify-env.sh
+  ```
+* **Verify Layer Discovery**:
+  ```bash
+  bash scripts/smoke-test-layer.sh
   ```
 * **Adjust Config Profiles**:
   * Global settings: `~/.config/steam-frame-lsfg/config.toml`
