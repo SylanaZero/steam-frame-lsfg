@@ -27,31 +27,50 @@ mkdir -p "$VULKAN_EXPLICIT_DIR"
 mkdir -p "$LIB_DIR"
 mkdir -p "$HOME/.local/bin"
 
-# 2. Check for Lossless.dll in Steam libraries; deploy bundled fallback
+# 2. Check for lsfg-vk.dll in Steam libraries
 EXISTING_DLL=""
 SEARCH_PATHS=(
-    "$HOME/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"
-    "$HOME/.steam/steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"
-    "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
     "$HOME/.local/share/Steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"
-    "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"
-    "/run/media/*/steamapps/common/Lossless Scaling/Lossless.dll"
-    "/run/media/*/*/steamapps/common/Lossless Scaling/Lossless.dll"
-    "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/Lossless.dll"
-    "${XDG_DATA_HOME:-$HOME/.local/share}/steam-frame-lsfg/lib/lsfg-vk.dll"
-    "$ROOT_DIR/Lossless.dll"
+    "$HOME/.steam/steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"
+    "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"
+    "/var/mnt/storage/steamapps/common/Lossless Scaling/lsfg-vk.dll"
     "$ROOT_DIR/lsfg-vk.dll"
-    "$SCRIPT_DIR/Lossless.dll"
     "$SCRIPT_DIR/lsfg-vk.dll"
 )
+
+# Also check dynamic libraries from libraryfolders.vdf
+for vdf in "$HOME/.local/share/Steam/steamapps/libraryfolders.vdf" "$HOME/.steam/steam/steamapps/libraryfolders.vdf"; do
+    if [ -f "$vdf" ]; then
+        while read -r libpath; do
+            [ -n "$libpath" ] && SEARCH_PATHS+=("$libpath/steamapps/common/Lossless Scaling/lsfg-vk.dll")
+        done < <(grep '"path"' "$vdf" 2>/dev/null | cut -d '"' -f 4 || true)
+    fi
+done
+
 for p in "${SEARCH_PATHS[@]}"; do
-    for match in $p; do
+    if [ -f "$p" ]; then
+        EXISTING_DLL="$p"
+        break
+    fi
+done
+
+# Check removable media / SD card paths with wildcards
+if [ -z "$EXISTING_DLL" ]; then
+    for match in /run/media/*/steamapps/common/Lossless\ Scaling/lsfg-vk.dll /run/media/*/*/steamapps/common/Lossless\ Scaling/lsfg-vk.dll; do
         if [ -f "$match" ]; then
             EXISTING_DLL="$match"
-            break 2
+            break
         fi
     done
-done
+fi
+
+# Fallback deep search across Steam directories if still not found
+if [ -z "$EXISTING_DLL" ]; then
+    EXISTING_DLL=$(find "$HOME/.local/share/Steam" "$HOME/.steam" /run/media -iname "lsfg-vk.dll" 2>/dev/null | head -n1 || true)
+fi
+
+# Clean up any stale or duplicated DLL in LIB_DIR to ensure in-place usage from Steam
+rm -f "$LIB_DIR/lsfg-vk.dll" "$LIB_DIR/Lossless.dll"
 
 safe_copy_file() {
     local src="$1"
@@ -59,11 +78,9 @@ safe_copy_file() {
     if [ ! -f "$src" ]; then
         return 0
     fi
-    # If source and destination paths are identical, do nothing
     if [ "$src" = "$dst" ]; then
         return 0
     fi
-    # If both exist and point to the same physical file / inode, do nothing
     if [ -f "$dst" ]; then
         local src_canon dst_canon
         src_canon="$(realpath "$src" 2>/dev/null || echo "$src")"
@@ -76,30 +93,27 @@ safe_copy_file() {
     cp -f "$src" "$dst" 2>/dev/null || true
 }
 
-deploy_dual_dll() {
-    local src="$1"
-    local dest_dir="$2"
-    safe_copy_file "$src" "$dest_dir/Lossless.dll"
-    safe_copy_file "$src" "$dest_dir/lsfg-vk.dll"
-}
-
 if [ -n "$EXISTING_DLL" ]; then
-    echo "Existing framegen DLL detected: $EXISTING_DLL"
-    EXISTING_DIR="$(dirname "$EXISTING_DLL")"
-    deploy_dual_dll "$EXISTING_DLL" "$LIB_DIR"
-    deploy_dual_dll "$EXISTING_DLL" "$EXISTING_DIR"
-    echo "Confirmed framegen DLLs ready in: $LIB_DIR"
+    echo "Found official lsfg-vk.dll in Steam: $EXISTING_DLL"
+    DLL_SIZE=$(stat -c%s "$EXISTING_DLL" 2>/dev/null || wc -c < "$EXISTING_DLL" 2>/dev/null || echo 0)
+    if [ "$DLL_SIZE" -gt 5000000 ]; then
+        echo "WARNING: File size ($DLL_SIZE bytes) resembles Windows Lossless.dll (~7.2 MB) rather than Linux lsfg-vk.dll (~2.1 MB)."
+        echo "Please make sure Lossless Scaling in Steam is set to the 'lsfg-vk' beta branch."
+    else
+        echo "Validated official 2.1 MB Linux Vulkan shader model (used in-place from Steam)."
+    fi
 else
     echo ""
     echo "=========================================================="
-    echo "  ERROR: Lossless Scaling DLL was not found!"
+    echo "  ERROR: lsfg-vk.dll was not found!"
     echo "=========================================================="
-    echo "Lossless Scaling Frame Generation requires the proprietary"
-    echo "shader model from Lossless Scaling (Steam App ID 993090)."
+    echo "Lossless Scaling Frame Generation on Linux requires the official"
+    echo "lsfg-vk.dll model from Lossless Scaling (Steam App ID 993090)."
     echo ""
-    echo "Please do one of the following:"
-    echo "  1. Install 'Lossless Scaling' from your Steam library."
-    echo "  2. Or place 'Lossless.dll' or 'lsfg-vk.dll' in this folder."
+    echo "To download it:"
+    echo "  1. In Steam, right-click 'Lossless Scaling' -> Properties -> Betas."
+    echo "  2. Under 'Beta Participation', select the 'lsfg-vk' branch."
+    echo "  3. Wait for Steam to download the update (which provides lsfg-vk.dll)."
     echo ""
     echo "Then re-run install.sh."
     echo "=========================================================="
@@ -144,25 +158,82 @@ echo "Installing Vulkan Layer binary and manifests..."
 # Remove legacy/conflicting layer manifests
 rm -f "$VULKAN_IMPLICIT_DIR/VkLayer_lsfg.json" "$VULKAN_EXPLICIT_DIR/VkLayer_lsfg.json"
 rm -f "$LIB_DIR/libVkLayer_lsfg.so"
+rm -f "$VULKAN_IMPLICIT_DIR/liblsfg-vk-layer.so" "$VULKAN_EXPLICIT_DIR/liblsfg-vk-layer.so"
 
 LAYER_SO=""
-for s in "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$SCRIPT_DIR/layer/liblsfg-vk-layer.so" "$LIB_DIR/liblsfg-vk-layer.so" "$VULKAN_IMPLICIT_DIR/liblsfg-vk-layer.so" "/usr/lib/liblsfg-vk-layer.so" "/usr/local/lib/liblsfg-vk-layer.so"; do
+for s in "$ROOT_DIR/layer/liblsfg-vk-layer.so" "$SCRIPT_DIR/layer/liblsfg-vk-layer.so"; do
     if [ -f "$s" ]; then
         LAYER_SO="$s"
         break
     fi
 done
 
-if [ -n "$LAYER_SO" ]; then
-    safe_copy_file "$LAYER_SO" "$LIB_DIR/liblsfg-vk-layer.so"
-    safe_copy_file "$LAYER_SO" "$VULKAN_IMPLICIT_DIR/liblsfg-vk-layer.so"
-    safe_copy_file "$LAYER_SO" "$VULKAN_EXPLICIT_DIR/liblsfg-vk-layer.so"
-    echo "Configured Vulkan layer from: $LAYER_SO"
-else
-    echo "Notice: Upstream liblsfg-vk-layer.so not found."
-    echo "Please download or install the official lsfg-vk layer from https://lsfg-vk.dev"
-    echo "and place liblsfg-vk-layer.so in $LIB_DIR/ or layer/liblsfg-vk-layer.so."
+# If precompiled binary is not present or rebuild requested, compile natively on-device
+if [ -z "$LAYER_SO" ] || [ "${1:-}" = "--rebuild" ]; then
+    echo ""
+    echo "=========================================================="
+    echo " Native Compilation: Building liblsfg-vk-layer.so for Steam Frame"
+    echo " Platform: Qualcomm Snapdragon 8 Gen 3 (ARM64 / aarch64)"
+    echo "=========================================================="
+
+    MISSING_TOOLS=()
+    for tool in git cmake ninja; do
+        if ! command -v "$tool" &>/dev/null; then MISSING_TOOLS+=("$tool"); fi
+    done
+    if ! command -v g++ &>/dev/null && ! command -v clang++ &>/dev/null; then
+        MISSING_TOOLS+=("g++/clang++")
+    fi
+
+    if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
+        echo "ERROR: Missing required build tools: ${MISSING_TOOLS[*]}"
+        echo "Please install base development packages (or enable Developer Mode)."
+        exit 1
+    fi
+
+    SUBMODULE_DIR="$ROOT_DIR/submodules/lsfg-vk"
+    if [ ! -d "$SUBMODULE_DIR" ] || [ ! -f "$SUBMODULE_DIR/CMakeLists.txt" ]; then
+        echo "[1/3] Cloning upstream lsfg-vk from https://git.lsfg-vk.dev/lsfg-vk.git..."
+        mkdir -p "$ROOT_DIR/submodules"
+        git clone --depth 1 https://git.lsfg-vk.dev/lsfg-vk.git "$SUBMODULE_DIR"
+    else
+        echo "[1/3] Upstream source found at $SUBMODULE_DIR"
+    fi
+
+    BUILD_DIR="$SUBMODULE_DIR/build-native"
+    echo "[2/3] Configuring CMake with Snapdragon 8 Gen 3 native flags..."
+    mkdir -p "$BUILD_DIR"
+    cmake -B "$BUILD_DIR" -S "$SUBMODULE_DIR" \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_CXX_FLAGS="-O3 -march=armv8.2-a+fp16 -mtune=cortex-a720 -static-libstdc++ -static-libgcc -fPIC" \
+        -DCMAKE_C_FLAGS="-O3 -march=armv8.2-a+fp16 -mtune=cortex-a720 -static-libstdc++ -static-libgcc -fPIC" \
+        -DLSFGVK_BUILD_LAYER=ON \
+        -DLSFGVK_BUILD_CLI=ON \
+        -DLSFGVK_BUILD_UI=OFF
+
+    echo "[3/3] Compiling native ARM64 Vulkan layer on Steam Frame..."
+    cmake --build "$BUILD_DIR" --target lsfg-vk-layer -j"$(nproc 2>/dev/null || echo 4)"
+
+    OUTPUT_SO=$(find "$BUILD_DIR" -name "liblsfg-vk-layer.so" | head -n1)
+    if [ -z "$OUTPUT_SO" ] || [ ! -f "$OUTPUT_SO" ]; then
+        echo "ERROR: liblsfg-vk-layer.so build failed."
+        exit 1
+    fi
+
+    if command -v strip &>/dev/null; then
+        strip --strip-unneeded "$OUTPUT_SO"
+    fi
+
+    mkdir -p "$ROOT_DIR/layer"
+    cp "$OUTPUT_SO" "$ROOT_DIR/layer/liblsfg-vk-layer.so"
+    LAYER_SO="$ROOT_DIR/layer/liblsfg-vk-layer.so"
+    echo "Build successful! Created: $LAYER_SO"
+    echo "=========================================================="
+    echo ""
 fi
+
+safe_copy_file "$LAYER_SO" "$LIB_DIR/liblsfg-vk-layer.so"
+echo "Configured Vulkan layer from: $LAYER_SO"
 
 
 # Write canonical Vulkan 1.3 layer manifest with absolute library path to both directories
@@ -214,24 +285,6 @@ else
     exit 1
 fi
 
-# 7. Optional Decky Loader Integration
-DECKY_PLUGIN_DIR="$HOME/homebrew/plugins"
-if [ -d "$DECKY_PLUGIN_DIR" ] && [ -d "$ROOT_DIR/decky-plugin" ]; then
-    echo "Decky Loader detected! Installing Steam Frame LSFG plugin..."
-    TARGET_PLUGIN="$DECKY_PLUGIN_DIR/steam-frame-lsfg"
-    rm -rf "$TARGET_PLUGIN"
-    mkdir -p "$TARGET_PLUGIN"
-    cp -r "$ROOT_DIR/decky-plugin/"* "$TARGET_PLUGIN/"
-    echo "Decky plugin installed to $TARGET_PLUGIN"
-    if systemctl is-active --quiet plugin_loader.service 2>/dev/null; then
-        echo "Restarting Decky Loader service..."
-        sudo systemctl restart plugin_loader.service || true
-    fi
-elif [ -d "$DECKY_PLUGIN_DIR" ]; then
-    echo "Decky Loader detected (standalone mode active, plugin not bundled)."
-else
-    echo "Decky Loader not found. Standalone mode ready."
-fi
 
 echo ""
 echo "=== Installation Complete ==="

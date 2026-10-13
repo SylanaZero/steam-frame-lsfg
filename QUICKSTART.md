@@ -5,8 +5,8 @@ Lossless Scaling Frame Generation (LSFG) for the **Valve Steam Frame** (Snapdrag
 ---
 
 ## 📋 Prerequisites
-1. **Lossless Scaling**: Purchased on Steam (App ID `993090`).
-2. **Patched ARM64 Vulkan Layer**: Custom-built `liblsfg-vk-layer.so` (see [Upstream Patching Guide in README.md](README.md#-what-needs-to-be-patched-in-upstream-lsfg-vk)).
+1. **Lossless Scaling (`lsfg-vk.dll`)**: Purchased on Steam (App ID `993090`). Right-click **Lossless Scaling** in Steam $\to$ **Properties** $\to$ **Betas** $\to$ select **`lsfg-vk`** branch.
+2. **ARM64 Vulkan Layer**: Built `liblsfg-vk-layer.so` targeting `aarch64` (see [Build Guide in README.md](README.md#-building-liblsfg-vk-layer-so-for-steam-frame-arm64)).
 3. **Valve Steam Frame**: Running SteamOS ARM64.
 
 ---
@@ -17,21 +17,13 @@ Lossless Scaling Frame Generation (LSFG) for the **Valve Steam Frame** (Snapdrag
 git clone https://github.com/SylanaZero/steam-frame-lsfg.git
 cd steam-frame-lsfg
 ```
-2. Place your compiled `liblsfg-vk-layer.so` into the `layer/` directory (or `~/.local/share/steam-frame-lsfg/lib/`):
-```bash
-cp /path/to/your/liblsfg-vk-layer.so layer/liblsfg-vk-layer.so
-```
-3. Run the installer:
+2. Run the installer:
 ```bash
 bash scripts/install.sh
 ```
-The installer sets up your `~/lsfg` launcher wrapper, registers the layer, applies anti-flicker presentation settings, and configures default per-game profiles.
-
-
-> [!NOTE]
-> **Lossless Scaling Branch Details:**
-> In Steam, *Lossless Scaling* provides the framegen model as `Lossless.dll` on the default branch, or as `lsfg-vk.dll` if you opt into the `lsfg-vk` beta branch (Properties $\to$ Betas).
-> `install.sh` automatically checks for **both** and mirrors both filenames into `~/.local/share/steam-frame-lsfg/lib/`, so either branch works out of the box.
+*If `liblsfg-vk-layer.so` is not already compiled, `install.sh` will automatically clone upstream `lsfg-vk` and compile it natively for the Snapdragon 8 Gen 3!*
+*(Optional: If you cross-compiled on an x86 PC, you can drop your precompiled `liblsfg-vk-layer.so` into `layer/` before running the installer to skip compilation).*
+The installer sets up your `~/lsfg` launcher wrapper, auto-discovers `lsfg-vk.dll`, registers the Vulkan layer, applies anti-flicker presentation settings, and configures default per-game profiles.
 
 ---
 

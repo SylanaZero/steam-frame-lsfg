@@ -12,114 +12,48 @@ A dedicated, hardware-optimized companion project providing **Lossless Scaling F
 
 > [!CAUTION]
 > ### ⚠️ CRITICAL PREREQUISITE & LICENSE COMPLIANCE NOTICE
-> **The scripts, installer, and launch wrapper in this repository WILL NOT WORK without a custom-patched, ARM64-compiled `liblsfg-vk-layer.so` binary.**
+> **The scripts, installer, and launch wrapper in this repository WILL NOT WORK without an ARM64-compiled `liblsfg-vk-layer.so` binary.**
 >
-> **Why are precompiled binaries and patch files NOT provided here?**
-> * Upstream **`lsfg-vk`** is developed by **PancakeTAS** and licensed under **[Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/)**. This license strictly prohibits distributing modified versions (derivatives), including distributing modified source trees, diffs/patch files, or precompiled derivative binaries.
-> * **`Lossless.dll`** is proprietary commercial software developed by **THS** (available on Steam, App ID `993090`).
+> **Why are precompiled binaries NOT provided here?**
+> * Upstream **`lsfg-vk`** is developed by **PancakeTAS** and licensed under **[Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0)](https://creativecommons.org/licenses/by-nc-nd/4.0/)**. This license strictly prohibits distributing modified versions or precompiled derivative binaries.
+> * **`lsfg-vk.dll`** is proprietary commercial software developed by **THS** (available on Steam, App ID `993090`, via the `lsfg-vk` beta branch).
 >
 > To maintain strict license compliance:
 > 1. **This repository DOES NOT distribute precompiled `liblsfg-vk-layer.so` binaries.**
-> 2. **This repository DOES NOT host `.patch` or `.diff` files.**
+> 2. **This repository DOES NOT host proprietary shader binaries (`lsfg-vk.dll`).**
 >
-> Instead, this project provides the independent launch wrapper, environment orchestration, SteamOS configs, and the **[Upstream Patching Guide](#-what-needs-to-be-patched-in-upstream-lsfg-vk)** below explaining what needs to be modified in upstream source so you can build your own working layer.
+> **Important Note on `lsfg-vk.dll` vs. `Lossless.dll`:**
+> On Linux / SteamOS, `Lossless.dll` is **not used**. `Lossless.dll` is the Windows package containing DirectX 11/12 bytecode. The Linux Vulkan layer requires **`lsfg-vk.dll`** (the stripped 2.1 MB Vulkan SPIR-V shader model), which is officially downloaded by switching *Lossless Scaling* in Steam to the **`lsfg-vk` beta branch**. Because `lsfg-vk.dll` is designed natively for `lsfg-vk`, **no shader pipeline patches are needed**—you only need to cross-compile stock upstream `lsfg-vk` for the ARM64 architecture!
 
 ---
 
-## 🛠️ What Needs to Be Patched in Upstream `lsfg-vk`
+## 🛠️ Building `liblsfg-vk-layer.so` for Steam Frame (ARM64)
 
-To get `lsfg-vk` working on the Steam Frame with modern releases of Lossless Scaling, an unpatched upstream build from [PancakeTAS/lsfg-vk](https://git.lsfg-vk.dev/lsfg-vk.git) will fail due to changes in modern DLL packaging and ARM64 C++ runtime dependencies. 
+Because upstream precompiled binaries from [lsfg-vk.dev](https://lsfg-vk.dev) are built for `x86_64` (standard PCs and Steam Deck), you must compile the layer for `aarch64` (ARM64) to run on the Snapdragon 8 Gen 3 SoC.
 
-If you are compiling your own layer, the following specific areas need to be modified:
+When building from upstream source ([`PancakeTAS/lsfg-vk`](https://git.lsfg-vk.dev/lsfg-vk.git)):
 
-### 1. Multi-API SPIR-V Resource ID Shift (+300 Offset)
-* **The Problem:** Stock `lsfg-vk` was written for legacy versions of `Lossless.dll` where Vulkan SPIR-V shaders began at Resource ID 1. Modern `Lossless.dll` (v3.x / multi-API) packages shaders for multiple graphics backends into a single binary:
-  * Resource IDs 101–200: Direct3D 11 bytecode
-  * Resource IDs 201–300: Direct3D 12 DXIL shaders
-  * **Resource IDs 301–400: Vulkan SPIR-V shaders** (shifted by `+300`)
-  If unpatched, the layer attempts to parse Direct3D shaders as SPIR-V or looks for non-existent IDs, immediately crashing the game with:
-  ```text
-  (lsfg-vk) [ERROR]: - Unable to find base shader 'mipmaps' in DLL
-  ```
-* **The Fix (`lsfg-vk-pipeline/src/library.cpp`):**
-  Implement dynamic resource offset auto-detection before querying shader resources:
-  ```cpp
-  // Auto-detect resource offset in the DLL (300 for DX11+DX12+Vulkan multi-API DLLs like Lossless.dll 3.x)
-  uint32_t shaderOffset = 0;
-  if (resources.find(303) != resources.end()) {
-      shaderOffset = 300;
-  } else if (resources.find(3) != resources.end()) {
-      shaderOffset = 0;
-  } else if (resources.find(103) != resources.end()) {
-      shaderOffset = 100;
-  } else {
-      for (uint32_t base : { 300U, 0U, 100U, 200U }) {
-          if (resources.find(base + 3) != resources.end()) {
-              shaderOffset = base;
-              break;
-          }
-      }
-  }
-  ```
-  All subsequent shader resource IDs must account for `shaderOffset`:
-  * Base shaders: `const uint32_t rid{shaderOffset + idx};`
-  * Quality/Performance shaders:
-    ```cpp
-    const std::pair<uint32_t, uint32_t> rid{
-        shaderOffset + idx + (halfPrecision ? 48 : 0),
-        shaderOffset + idx + (halfPrecision ? 48 : 0) + 24
-    };
-    ```
+### 1. Stock Shader Compatibility (No Code Patches Needed)
+When using **`lsfg-vk.dll`** from the Steam beta branch:
+* Shaders start at Resource IDs `1..99` and Resource ID `2147488584U` for `mipmaps` is present natively.
+* **Stock upstream code (`library.cpp`) parses `lsfg-vk.dll` cleanly without any code modifications.**
 
-### 2. Embedded HDR Mipmaps Handling
-* **The Problem:** Upstream hardcoded a legacy resource ID (`2147488584U`) for the `mipmaps` shader. In v3.x DLLs, this resource is absent.
-* **The Fix (`lsfg-vk-pipeline/src/library.cpp`):**
-  Intercept the `mipmaps` base shader loading and wire it directly to the embedded HDR shader array (`Mipmaps.h`):
-  ```cpp
-  if (name == "mipmaps") {
-      std::vector<uint32_t> shaderData(Mipmaps_len / 4);
-      std::copy_n(
-          reinterpret_cast<const uint32_t*>(Mipmaps),
-          Mipmaps_len / 4,
-          shaderData.data()
-      );
-      this->m_baseShaders["mipmaps"] = vkhelper::createShaderModule(dld, device, shaderData);
-      continue;
-  }
-  ```
+### 2. Linker Configuration for SteamOS ARM64
+When cross-compiling with GCC for ARM64, dynamic `libstdc++.so` or `libgcc_s.so` links can fail at runtime due to `GLIBCXX` symbol mismatches against SteamOS's system libraries.
 
-### 3. Fallback Probing for the `generate` Shader
-* **The Problem:** The `generate` compute shader ID varies between minor revisions of the DLL.
-* **The Fix (`lsfg-vk-pipeline/src/library.cpp`):**
-  Add fallback resolution when locating the `generate` bytecode:
-  ```cpp
-  if (name == "generate") {
-      auto it = resources.find(shaderOffset + 99);
-      if (it == resources.end()) it = resources.find(shaderOffset + 1);
-      if (it == resources.end()) it = resources.find(1);
-      if (it == resources.end()) it = resources.find(99);
-      if (it == resources.end()) {
-          throw std::runtime_error("Unable to find base shader 'generate' in DLL");
-      }
-      // Proceed with bytecode patching...
-  ```
+Ensure standard C++ runtime libraries are linked statically:
+```cmake
+# In lsfg-vk-layer/CMakeLists.txt (or via -DCMAKE_SHARED_LINKER_FLAGS)
+target_link_options(lsfg-vk-layer PRIVATE
+  "-static-libstdc++"
+  "-static-libgcc"
+  "LINKER:--exclude-libs,ALL")
+```
 
-### 4. Linker Configuration for SteamOS ARM64
-* **The Problem:** When cross-compiling with GCC for ARM64, dynamic `libstdc++.so` or `libgcc_s.so` links can fail at runtime due to `GLIBCXX` symbol mismatches against SteamOS's system libraries.
-* **The Fix (`lsfg-vk-layer/CMakeLists.txt`):**
-  Statically link the standard C++ runtime into the layer:
-  ```cmake
-  target_link_options(lsfg-vk-layer PRIVATE
-    "-static-libstdc++"
-    "-static-libgcc"
-    "LINKER:--exclude-libs,ALL")
-  ```
-
-### 5. Compiling for Snapdragon 8 Gen 3 (Adreno 750)
-When compiling the Vulkan layer for ARM64:
+### 3. Compiler Flags for Snapdragon 8 Gen 3 (Adreno 750)
 * Target architecture: `aarch64-linux-gnu`
-* Tuning flags: `-O3 -march=armv8.2-a+fp16 -mtune=cortex-a720 -fPIC`
-* For complete step-by-step toolchain and CMake setup details, refer to [`docs/REPLICATION_GUIDE.md`](docs/REPLICATION_GUIDE.md).
+* Optimization flags: `-O3 -march=armv8.2-a+fp16 -mtune=cortex-a720 -fPIC`
+* For a complete step-by-step cross-compilation walkthrough, see [`docs/REPLICATION_GUIDE.md`](docs/REPLICATION_GUIDE.md).
 
 ---
 
@@ -159,10 +93,10 @@ steam-frame-lsfg/
 
 | File / Component | Category | Purpose & Description |
 | :--- | :--- | :--- |
-| **`scripts/install.sh`** | **Core Installer** | **Primary installation script.** Configures Vulkan loader manifests, sets up default configuration profiles, registers your compiled `liblsfg-vk-layer.so`, and installs `~/lsfg`. |
-| **`scripts/lsfg-frame`** | **Core Runtime** | **Launch wrapper.** Installed to `~/lsfg` and `~/.local/bin/lsfg-frame`. Handles `Lossless.dll` auto-discovery, per-game TOML profile resolution, and flicker-free presentation pacing. |
+| **`scripts/install.sh`** | **Core Installer** | **Primary installation script.** Automatically compiles `liblsfg-vk-layer.so` on-device if not present, configures Vulkan loader manifests, sets up default configuration profiles, and installs `~/lsfg`. |
+| **`scripts/lsfg-frame`** | **Core Runtime** | **Launch wrapper.** Installed to `~/lsfg` and `~/.local/bin/lsfg-frame`. Handles `lsfg-vk.dll` auto-discovery, per-game TOML profile resolution, and flicker-free presentation pacing. |
 | **`layer/VkLayer_LSFGVK_frame_generation.json`** | **Core Runtime** | **Vulkan layer manifest template.** Registered with SteamOS's Vulkan loader (`implicit_layer.d` and `explicit_layer.d`) for layer discovery. |
-| **`scripts/verify-env.sh`** | **Diagnostics** | **Environment verifier.** Checks CPU architecture, Snapdragon 8 Gen 3 core clusters, Mesa Turnip driver status, FEX-Emu, and Steam libraries. |
+| **`scripts/verify-env.sh`** | **Diagnostics** | **Environment verifier.** Checks CPU architecture, Snapdragon 8 Gen 3 core clusters, Mesa Turnip driver status, FEX-Emu, and `lsfg-vk.dll`. |
 | **`scripts/smoke-test-layer.sh`** | **Diagnostics** | **Diagnostic test.** Verifies layer ELF architecture, manifest validity, and Vulkan loader discovery via `vulkaninfo`. |
 | **`scripts/build-cross-layer.sh`** | **Developer Tool** | **Reference build script.** Demonstrates building the layer from upstream `lsfg-vk` source using `aarch64-linux-gnu-g++`. |
 | **`scripts/install-turnip-aurora.sh`** | **Experimental Tool** | **Alternative driver installer.** Downloads and installs community Balemuni Aurora Turnip driver builds for testing bleeding-edge driver fixes. |
@@ -170,16 +104,21 @@ steam-frame-lsfg/
 | **`config/profiles/*.toml`** | **Configuration** | **Per-game optimization profiles.** Presets deployed by the installer (`1091500.toml` for Cyberpunk 2077, `1145360.toml` for Hades II, `default.toml`). |
 | **`decky-plugin/`** | **Optional UI** | **Decky Loader plugin.** Experimental Quick Access Menu (QAM) slider panel for adjusting multipliers and optical flow scale on the fly. |
 | **`docs/ARCHITECTURE.md`** | **Documentation** | **Hardware architecture guide.** Comprehensive technical documentation on Snapdragon 8 Gen 3, Adreno 750 GMEM tile memory, and Gamescope WSI. |
-| **`docs/REPLICATION_GUIDE.md`** | **Documentation** | **Developer guide.** Full technical walkthrough of building, patching, and tuning the layer. |
+| **`docs/REPLICATION_GUIDE.md`** | **Documentation** | **Developer guide.** Full technical walkthrough of building, configuring, and tuning the layer for ARM64. |
 
 ---
 
 ## 🚀 Quickstart & Setup Guide
 
 ### Step 1: Prerequisites
-1. **Lossless Scaling Ownership**: Purchase and download [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) on Steam (App ID `993090`).
-2. **Patched ARM64 Vulkan Layer**: Build your own ARM64 `liblsfg-vk-layer.so` using the [Upstream Patching Guide](#-what-needs-to-be-patched-in-upstream-lsfg-vk).
-3. **Valve Steam Frame**: Running SteamOS ARM64 with native Mesa Turnip Vulkan driver.
+1. **Lossless Scaling Ownership (`lsfg-vk.dll`)**:
+   * Purchase [Lossless Scaling](https://store.steampowered.com/app/993090/Lossless_Scaling/) on Steam (App ID `993090`).
+   * In your Steam Library, right-click **Lossless Scaling** $\to$ **Properties** $\to$ **Betas**.
+   * Under **Beta Participation**, select the **`lsfg-vk`** branch. Steam will download `lsfg-vk.dll`.
+2. **ARM64 Vulkan Layer (`liblsfg-vk-layer.so`)**:
+   * Build the ARM64 layer from upstream [PancakeTAS/lsfg-vk](https://git.lsfg-vk.dev/lsfg-vk.git) following the [Build Guide](#-building-liblsfg-vk-layer-so-for-steam-frame-arm64).
+3. **Valve Steam Frame**:
+   * Running SteamOS ARM64 with native Mesa Turnip Vulkan driver.
 
 ### Step 2: Place the Compiled Layer & Run Installer
 1. Clone this repository on your Steam Frame:
@@ -187,7 +126,7 @@ steam-frame-lsfg/
    git clone https://github.com/SylanaZero/steam-frame-lsfg.git
    cd steam-frame-lsfg
    ```
-2. Copy your compiled, patched ARM64 `liblsfg-vk-layer.so` into the `layer/` directory (or `~/.local/share/steam-frame-lsfg/lib/`):
+2. Copy your compiled ARM64 `liblsfg-vk-layer.so` into the `layer/` directory (or `~/.local/share/steam-frame-lsfg/lib/`):
    ```bash
    cp /path/to/your/liblsfg-vk-layer.so layer/liblsfg-vk-layer.so
    ```
@@ -198,7 +137,7 @@ steam-frame-lsfg/
 
 The installer will:
 * Verify the ARM64 environment and Mesa Turnip Vulkan driver.
-* Auto-discover `Lossless.dll` from your Steam library.
+* Auto-discover `lsfg-vk.dll` from your Steam library.
 * Install and link `liblsfg-vk-layer.so` into system Vulkan directories.
 * Generate valid Vulkan 1.3 explicit and implicit layer manifests.
 * Install the launch wrapper to `~/lsfg` and `~/.local/bin/lsfg-frame`.
@@ -285,7 +224,7 @@ This project's original tooling, scripts, configuration profiles, and documentat
 * **`lsfg-vk`**: Upstream Vulkan compatibility layer developed by [PancakeTAS](https://lsfg-vk.dev), licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/).
 
 ### ⚠️ Upstream Compliance Notice
-* **Independent Companion:** This repository is an independent companion configuration and launch wrapper for the Valve Steam Frame. It does not distribute, fork, or host `lsfg-vk` binaries or patch files.
+* **Independent Companion:** This repository is an independent companion configuration and launch wrapper for the Valve Steam Frame. It does not distribute, fork, or host `lsfg-vk` binaries or proprietary shaders.
 * **Official Layer:** Users must obtain official source code from [lsfg-vk.dev](https://lsfg-vk.dev) / [git.lsfg-vk.dev](https://git.lsfg-vk.dev/lsfg-vk.git).
 * **No Derivative Distribution:** In accordance with the CC BY-NC-ND 4.0 license, this repository hosts no precompiled layer binaries and no patch files.
 

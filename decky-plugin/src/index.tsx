@@ -95,8 +95,8 @@ const Content: VFC<{ serverApi: ServerAPI }> = ({ serverApi }) => {
           label="Engine Status"
           description={
             status?.dll_found
-              ? "Lossless.dll verified & loaded"
-              : "Lossless.dll missing (Steam App 993090 required)"
+              ? "lsfg-vk.dll verified & loaded"
+              : "lsfg-vk.dll missing (Steam App 993090 'lsfg-vk' beta branch required)"
           }
           icon={
             status?.dll_found ? (

@@ -23,15 +23,16 @@ class Plugin:
         pass
 
     async def get_status(self) -> dict:
-        """Returns whether Lossless.dll is available and the current global settings."""
+        """Returns whether lsfg-vk.dll is available and the current global settings."""
         dll_found = False
         dll_path = ""
         
         search_paths = [
-            os.path.expanduser("~/.steam/steam/steamapps/common/Lossless Scaling/Lossless.dll"),
-            os.path.expanduser("~/.local/share/Steam/steamapps/common/Lossless Scaling/Lossless.dll"),
-            *glob.glob("/run/media/*/steamapps/common/Lossless Scaling/Lossless.dll"),
-            *glob.glob("/run/media/*/*/steamapps/common/Lossless Scaling/Lossless.dll"),
+            os.path.expanduser("~/.local/share/steam-frame-lsfg/lib/lsfg-vk.dll"),
+            os.path.expanduser("~/.steam/steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"),
+            os.path.expanduser("~/.local/share/Steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"),
+            *glob.glob("/run/media/*/steamapps/common/Lossless Scaling/lsfg-vk.dll"),
+            *glob.glob("/run/media/*/*/steamapps/common/Lossless Scaling/lsfg-vk.dll"),
         ]
         
         for path in search_paths:

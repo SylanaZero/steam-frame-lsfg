@@ -29,7 +29,7 @@ The user posed three architectural avenues:
 | **Steam Client Resiliency** | ⚠️ Breaks when Steam Client CEF updates | ✅ Immune to Steam Client CEF updates | ✅ Core stays functional; UI recovers on plugin update |
 | **In-Game Quick Access** | ✅ Quick Access Menu (QAM) sliders | ❌ Requires quitting game to edit launch options | ✅ QAM sliders when Decky is active; config fallback otherwise |
 | **Driver & SoC Tuning** | ❌ Generic x86 port, lacks Adreno 750 tuning | ⚠️ Manual env variables required | ✅ Automatic Adreno 750 / Turnip optimizations baked in |
-| **`Lossless.dll` FEX Bridge** | ⚠️ Fails if not properly handled across FEX boundary | ⚠️ Depends on manual file copying | ✅ Automated detection from Steam Library + Wine/FEX path mapping |
+| **`lsfg-vk.dll` Model Bridge** | ⚠️ Fails if not properly handled across FEX boundary | ⚠️ Depends on manual file copying | ✅ Automated detection from Steam Library + Wine/FEX path mapping |
 
 ### Why Option 3 (Hybrid Layered Architecture) is Optimal:
 1. **Separation of Concerns**: The Vulkan frame interception layer (`lsfg-vk`) must execute close to the GPU driver (Mesa Turnip). Decky Loader is merely a UI frontend running in the Steam CEF browser. Tying driver-level frame generation strictly to a web plugin causes severe fragility.
@@ -55,7 +55,7 @@ The user posed three architectural avenues:
 |                                                                                   |
 |   ~/.config/steam-frame-lsfg/config.toml  <--->  scripts/lsfg-frame wrapper       |
 |   - Per-AppID Profiles (profiles/<appid>.toml)                                    |
-|   - Auto-locates Lossless.dll in Steam Library                                    |
+|   - Auto-locates lsfg-vk.dll in Steam Library                                     |
 +-----------------------------------------------------------------------------------+
                                        |
                                        v
@@ -75,7 +75,7 @@ The user posed three architectural avenues:
 |                                                                                   |
 |   VK_LAYER_LSFGVK_frame_generation (Native ARM64 `liblsfg-vk-layer.so`)           |
 |   - Hooks vkQueuePresentKHR & vkCreateSwapchainKHR                                |
-|   - Loads frame-generation model from licensed Lossless.dll                       |
+|   - Loads frame-generation model from licensed lsfg-vk.dll                        |
 |   - Executes optical flow & intermediate frame synthesis                          |
 |   - Tuned for Adreno 750 FP16 Compute Shaders                                     |
 +-----------------------------------------------------------------------------------+
